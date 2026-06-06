@@ -1,3 +1,4 @@
+import warnings
 from django.conf import settings
 from datetime import datetime
 
@@ -6,21 +7,39 @@ class ElasticsearchManager:
     def __init__(self):
         es_config = getattr(settings, 'ELASTICSEARCH_DSL', {})
         default_config = es_config.get('default', {})
-        self.hosts = default_config.get('hosts', 'localhost:9200')
-        self.timeout = default_config.get('timeout', 30)
+        self._client_kwargs = dict(default_config)
         self.index_name = getattr(settings, 'ES_INDEX_NAME', 'documents')
         self._es = None
+        warnings.filterwarnings('ignore', category=Warning,
+                                message='.*Unverified HTTPS.*')
 
     @property
     def es(self):
         if self._es is None:
             from elasticsearch import Elasticsearch
-            self._es = Elasticsearch(self.hosts, timeout=self.timeout)
+            kwargs = dict(self._client_kwargs)
+            hosts = kwargs.pop('hosts', 'https://localhost:9200')
+            if 'http_auth' in kwargs:
+                auth = kwargs.pop('http_auth')
+                if isinstance(auth, (tuple, list)) and len(auth) == 2:
+                    kwargs['basic_auth'] = (str(auth[0]), str(auth[1]))
+            if isinstance(hosts, str):
+                hosts = [hosts]
+            self._es = Elasticsearch(hosts, **kwargs)
         return self._es
 
+    def _health_check(self):
+        try:
+            return self.es.ping()
+        except Exception:
+            return False
+
     def create_index(self):
-        if self.es.indices.exists(index=self.index_name):
-            return True
+        try:
+            if self.es.indices.exists(index=self.index_name):
+                return True
+        except Exception:
+            pass
         mappings = {
             'settings': {
                 'number_of_shards': 1,
@@ -61,20 +80,30 @@ class ElasticsearchManager:
                 }
             }
         }
-        self.es.indices.create(index=self.index_name, body=mappings)
-        return True
+        try:
+            self.es.indices.create(index=self.index_name,
+                                   settings=mappings['settings'],
+                                   mappings=mappings['mappings'])
+            return True
+        except Exception as e:
+            if 'resource_already_exists' in str(e):
+                return True
+            raise
 
     def delete_index(self):
-        if self.es.indices.exists(index=self.index_name):
-            self.es.indices.delete(index=self.index_name)
-            return True
+        try:
+            if self.es.indices.exists(index=self.index_name):
+                self.es.indices.delete(index=self.index_name)
+                return True
+        except Exception:
+            pass
         return False
 
     def index_document(self, doc_id: int, title: str, content: str,
                        file_type: str, file_path: str, file_size: int,
                        uploaded_at: datetime):
         self.create_index()
-        body = {
+        document = {
             'doc_id': doc_id,
             'title': title,
             'content': content,
@@ -83,23 +112,27 @@ class ElasticsearchManager:
             'file_size': file_size,
             'uploaded_at': uploaded_at,
         }
-        self.es.index(index=self.index_name, id=str(doc_id), body=body)
+        self.es.index(index=self.index_name, id=str(doc_id), document=document)
         return True
 
     def update_document(self, doc_id: int, **kwargs):
-        self.es.update(index=self.index_name, id=str(doc_id), body={'doc': kwargs})
+        self.es.update(index=self.index_name, id=str(doc_id), doc=kwargs)
         return True
 
     def delete_document(self, doc_id: int):
-        if self.es.exists(index=self.index_name, id=str(doc_id)):
-            self.es.delete(index=self.index_name, id=str(doc_id))
-            return True
+        try:
+            if self.es.exists(index=self.index_name, id=str(doc_id)):
+                self.es.delete(index=self.index_name, id=str(doc_id))
+                return True
+        except Exception:
+            pass
         return False
 
     def search(self, query: str, page: int = 1, page_size: int = 10):
         self.create_index()
         from_ = (page - 1) * page_size
-        search_body = {
+        search_kwargs = {
+            'index': self.index_name,
             'query': {
                 'multi_match': {
                     'query': query,
@@ -128,22 +161,29 @@ class ElasticsearchManager:
                 {'_score': {'order': 'desc'}},
                 {'uploaded_at': {'order': 'desc'}}
             ],
-            'from': from_,
+            'from_': from_,
             'size': page_size,
         }
-        response = self.es.search(index=self.index_name, body=search_body)
-        total = response['hits']['total']['value'] if isinstance(
-            response['hits']['total'], dict) else response['hits']['total']
+        response = self.es.search(**search_kwargs)
+        total_info = response.get('hits', {}).get('total', {})
+        if isinstance(total_info, dict):
+            total = total_info.get('value', 0)
+        else:
+            total = total_info or 0
         results = []
-        for hit in response['hits']['hits']:
-            source = hit['_source']
+        for hit in response.get('hits', {}).get('hits', []):
+            source = hit.get('_source', {})
             highlights = hit.get('highlight', {})
-            title = highlights.get('title', [source.get('title', '')])[0]
+            title_highlight = highlights.get('title')
+            if title_highlight:
+                title = title_highlight[0]
+            else:
+                title = source.get('title', '')
             content_fragments = highlights.get('content', [])
             if content_fragments:
                 content_snippet = ' ... '.join(content_fragments)
             else:
-                content_snippet = source.get('content', '')[:200]
+                content_snippet = (source.get('content', '') or '')[:200]
             results.append({
                 'doc_id': source.get('doc_id'),
                 'title': title,
@@ -178,6 +218,7 @@ class ElasticsearchManager:
 
     def count(self):
         try:
-            return self.es.count(index=self.index_name)['count']
+            resp = self.es.count(index=self.index_name)
+            return resp.get('count', 0)
         except Exception:
             return 0
