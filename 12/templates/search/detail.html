@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ doc.title }} - 文档详情{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card border-0 shadow">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-file-earmark-{{ doc.file_type }} text-primary"></i>
+                    {{ doc.title }}
+                </h4>
+                <div>
+                    <span class="badge bg-{{ doc.file_type }} me-2">{{ doc.file_type|upper }}</span>
+                    <span class="badge bg-secondary">{{ doc.file_size|filesizeformat }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3 text-muted small">
+                    <i class="bi bi-calendar"></i> 上传时间: {{ doc.uploaded_at|date:"Y-m-d H:i:s" }}
+                    {% if doc.indexed %}
+                        <span class="ms-3"><i class="bi bi-check-circle text-success"></i> 已建立索引</span>
+                    {% else %}
+                        <span class="ms-3"><i class="bi bi-x-circle text-warning"></i> 未建立索引</span>
+                    {% endif %}
+                    {% if doc.file %}
+                        <a href="{{ doc.file.url }}" class="ms-3" target="_blank">
+                            <i class="bi bi-download"></i> 下载原文件
+                        </a>
+                    {% endif %}
+                </div>
+                <hr>
+                {% if doc.content %}
+                    <div class="document-content p-4 bg-light rounded" style="max-height: 600px; overflow-y: auto;">
+                        {% if query %}
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">{{ doc.content }}</pre>
+                        {% else %}
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">{{ doc.content }}</pre>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center py-5">文档内容为空或解析失败</p>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-white">
+                <a href="{% url 'search:search' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> 返回搜索
+                </a>
+                <a href="{% url 'search:document_list' %}" class="btn btn-outline-info">
+                    <i class="bi bi-list"></i> 文档列表
+                </a>
+                <form method="post" action="{% url 'search:delete_document' doc.id %}" class="d-inline ms-2"
+                      onsubmit="return confirm('确定删除此文档？');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger">
+                        <i class="bi bi-trash"></i> 删除
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+em.highlight {
+    background-color: #fff3cd;
+    color: #d63384;
+    font-style: normal;
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+.badge.bg-txt { background-color: #6c757d !important; }
+.badge.bg-pdf { background-color: #dc3545 !important; }
+.badge.bg-doc, .badge.bg-docx { background-color: #0d6efd !important; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if query %}
+(function() {
+    const content = document.querySelector('.document-content pre');
+    if (content) {
+        const text = content.innerHTML;
+        const regex = new RegExp('(' + '{{ query|escapejs }}'.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        content.innerHTML = text.replace(regex, '<em class="highlight">$1</em>');
+    }
+})();
+{% endif %}
+</script>
+{% endblock %}

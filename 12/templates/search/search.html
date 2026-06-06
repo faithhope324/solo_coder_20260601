@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if query %}{{ query }} - {% endif %}搜索结果 - 文档搜索引擎{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <form action="{% url 'search:search' %}" method="get" class="d-flex gap-2">
+            <div class="input-group input-group-lg flex-grow-1">
+                <input type="text" name="q" class="form-control" value="{{ query }}"
+                       placeholder="输入关键词搜索文档..." aria-label="搜索" id="searchInput">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-search"></i> 搜索
+                </button>
+                {% if query %}
+                    <a href="{% url 'search:search' %}" class="btn btn-outline-secondary" title="清除">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-fire"></i> 热门搜索</h6>
+            </div>
+            <div class="card-body">
+                {% if hot_keywords %}
+                    {% for kw in hot_keywords %}
+                        <a href="{% url 'search:search' %}?q={{ kw.query|urlencode }}"
+                           class="badge bg-{% cycle 'primary' 'success' 'warning' 'info' 'secondary' %} text-decoration-none me-1 mb-2">
+                            {{ kw.query }}
+                            <span class="badge bg-white text-dark ms-1">{{ kw.search_count }}</span>
+                        </a>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted small mb-0">暂无热门搜索</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-clock-history"></i> 搜索历史</h6>
+            </div>
+            <div class="card-body">
+                {% if search_history %}
+                    <div class="list-group list-group-flush">
+                        {% for hist in search_history %}
+                            <a href="{% url 'search:search' %}?q={{ hist.query|urlencode }}"
+                               class="list-group-item list-group-item-action border-0 px-0 py-2 small">
+                                <i class="bi bi-search text-muted me-1"></i>{{ hist.query }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted small mb-0">暂无搜索历史</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        {% if error %}
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> {{ error }}
+            </div>
+        {% endif %}
+
+        {% if query %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    搜索 "<strong class="text-primary">{{ query }}</strong>"
+                    <small class="text-muted ms-2">共找到 {{ total }} 条结果</small>
+                </h5>
+                {% if total > 0 %}
+                    <small class="text-muted">按相关性排序</small>
+                {% endif %}
+            </div>
+
+            {% if results %}
+                <div class="list-group mb-4">
+                    {% for result in results %}
+                        <div class="list-group-item list-group-item-action border-0 shadow-sm mb-2 rounded">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="mb-1">
+                                    <a href="{% url 'search:document_detail' result.doc_id %}?q={{ query|urlencode }}"
+                                       class="text-decoration-none">
+                                        {{ result.title|safe }}
+                                    </a>
+                                </h6>
+                                <span class="badge bg-{{ result.file_type|default:'secondary' }} ms-2">
+                                    {{ result.file_type|upper }}
+                                </span>
+                            </div>
+                            <p class="mb-2 text-muted small" style="line-height:1.8;">
+                                {{ result.content_snippet|safe }}...
+                            </p>
+                            <div class="d-flex align-items-center small text-muted">
+                                <i class="bi bi-file-earmark me-1"></i>
+                                <span>{{ result.raw_title }}</span>
+                                <span class="mx-2">|</span>
+                                <i class="bi bi-hdd me-1"></i>
+                                <span>{{ result.file_size|filesizeformat }}</span>
+                                <span class="mx-2">|</span>
+                                <i class="bi bi-stars me-1"></i>
+                                <span>相关度: {{ result.score|floatformat:2 }}</span>
+                                <span class="mx-2">|</span>
+                                <i class="bi bi-calendar me-1"></i>
+                                <span>{{ result.uploaded_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                {% if total_pages > 1 %}
+                    <nav aria-label="分页导航">
+                        <ul class="pagination justify-content-center">
+                            {% if page > 1 %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?q={{ query|urlencode }}&page={{ page|add:-1 }}">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+                                </li>
+                            {% endif %}
+
+                            {% for p in page_range %}
+                                {% if p == page %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ p }}</span>
+                                    </li>
+                                {% elif p == '...' %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?q={{ query|urlencode }}&page={{ p }}">{{ p }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page < total_pages %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?q={{ query|urlencode }}&page={{ page|add:1 }}">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <div class="display-1 text-muted mb-3"><i class="bi bi-search-x"></i></div>
+                    <h4 class="text-muted">没有找到相关文档</h4>
+                    <p class="text-muted">试试其他关键词，或者<a href="{% url 'search:upload' %}">上传更多文档</a></p>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <div class="display-1 text-muted mb-3"><i class="bi bi-search"></i></div>
+                <h4 class="text-muted">输入关键词开始搜索</h4>
+                <p class="text-muted">支持对 PDF、Word、TXT 文档进行全文检索</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+em.highlight {
+    background-color: #fff3cd;
+    color: #d63384;
+    font-style: normal;
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+.badge.bg-txt { background-color: #6c757d !important; }
+.badge.bg-pdf { background-color: #dc3545 !important; }
+.badge.bg-doc, .badge.bg-docx { background-color: #0d6efd !important; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const input = document.getElementById('searchInput');
+input.focus();
+input.setSelectionRange(input.value.length, input.value.length);
+</script>
+{% endblock %}
