@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主持人控制台 - 在线抢答系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50">
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-6 shadow-lg">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <a href="/" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span class="font-bold text-lg">抢答系统</span>
+                </a>
+                <span class="text-white/60">|</span>
+                <span class="font-medium">主持人控制台</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
+                    <span class="text-white/70 text-sm">房间号：</span>
+                    <span class="font-mono font-bold tracking-wider">{{ room_id }}</span>
+                    <button onclick="copyRoomId()" class="ml-2 text-white/70 hover:text-white transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
+                    <span class="text-white/70 text-sm">轮次：</span>
+                    <span id="roundNum" class="font-bold">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </span>
+                        出题控制
+                    </h2>
+
+                    <div id="questionInputArea" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">当前题目</label>
+                            <textarea id="questionText" rows="3" placeholder="请输入题目内容..."
+                                class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-lg"></textarea>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="startQuestion()" id="startBtn"
+                                class="flex-1 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-green-500/30 flex items-center justify-center space-x-2">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span>开始抢答</span>
+                            </button>
+                            <button onclick="resetRoom()"
+                                class="px-6 py-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all flex items-center justify-center">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="questionActiveArea" class="hidden space-y-4">
+                        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border-2 border-indigo-200">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-3 py-1 bg-indigo-500 text-white text-sm font-medium rounded-full animate-pulse">
+                                        抢答中
+                                    </span>
+                                    <span class="text-gray-500 text-sm">第 <span id="currentRound" class="font-bold">1</span> 轮</span>
+                                </div>
+                                <div class="text-2xl font-bold text-indigo-600" id="buzzCountdown">10</div>
+                            </div>
+                            <p id="currentQuestionText" class="text-xl text-gray-800 font-medium leading-relaxed"></p>
+                        </div>
+
+                        <div id="buzzResultArea" class="hidden">
+                            <div class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border-2 border-yellow-300">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white text-3xl shadow-lg">
+                                        🏆
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-yellow-700 font-medium">第一位抢答者</p>
+                                        <p id="buzzWinner" class="text-2xl font-bold text-gray-800"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex space-x-3">
+                            <button onclick="endQuestion(true)"
+                                class="flex-1 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all flex items-center justify-center space-x-2">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span>回答正确 (+1分)</span>
+                            </button>
+                            <button onclick="endQuestion(false)"
+                                class="flex-1 py-4 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl font-bold text-lg hover:from-red-600 hover:to-rose-700 transition-all flex items-center justify-center space-x-2">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                <span>回答错误 (0分)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                        </span>
+                        在线玩家
+                        <span id="playerCount" class="ml-auto text-sm font-normal text-gray-500">0 人在线</span>
+                    </h2>
+                    <div id="playersList" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </span>
+                        实时排行榜
+                    </h2>
+                    <div id="leaderboard" class="space-y-3">
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </span>
+                        活动日志
+                    </h2>
+                    <div id="activityLog" class="space-y-2 max-h-64 overflow-y-auto">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="bg-gray-800 text-white px-6 py-3 rounded-xl shadow-lg flex items-center space-x-3">
+            <span id="toastIcon"></span>
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        const roomId = '{{ room_id }}';
+        const hostName = localStorage.getItem(`host_${roomId}`) || '主持人';
+        let socket = null;
+        let countdownTimer = null;
+        let countdownValue = 10;
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
+
+            const icons = {
+                success: '✅',
+                error: '❌',
+                info: 'ℹ️',
+                warning: '⚠️'
+            };
+
+            toastIcon.textContent = icons[type] || icons.info;
+            toastMessage.textContent = message;
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 3000);
+        }
+
+        function copyRoomId() {
+            navigator.clipboard.writeText(roomId);
+            showToast('房间号已复制', 'success');
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('activityLog');
+            const time = new Date().toLocaleTimeString();
+            const colors = {
+                success: 'text-green-600 bg-green-50',
+                error: 'text-red-600 bg-red-50',
+                info: 'text-blue-600 bg-blue-50',
+                warning: 'text-yellow-600 bg-yellow-50',
+                buzz: 'text-purple-600 bg-purple-50'
+            };
+
+            const entry = document.createElement('div');
+            entry.className = `text-sm px-3 py-2 rounded-lg ${colors[type] || colors.info}`;
+            entry.innerHTML = `<span class="opacity-60">[${time}]</span> ${message}`;
+            log.insertBefore(entry, log.firstChild);
+
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function updatePlayers(players) {
+            const list = document.getElementById('playersList');
+            document.getElementById('playerCount').textContent = `${players.length} 人在线`;
+
+            if (players.length === 0) {
+                list.innerHTML = '<div class="col-span-full text-center py-8 text-gray-400">暂无玩家加入</div>';
+                return;
+            }
+
+            list.innerHTML = players.map(player => `
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 text-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full mx-auto mb-2 flex items-center justify-center text-white font-bold text-lg">
+                        ${player.player_name.charAt(0)}
+                    </div>
+                    <p class="font-medium text-gray-800 truncate">${player.player_name}</p>
+                </div>
+            `).join('');
+        }
+
+        function updateLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard');
+
+            if (leaderboard.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-400">暂无得分</div>';
+                return;
+            }
+
+            const medals = ['🥇', '🥈', '🥉'];
+
+            container.innerHTML = leaderboard.map((item, index) => `
+                <div class="flex items-center space-x-3 p-3 rounded-xl ${index === 0 ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200' : 'bg-gray-50'}">
+                    <div class="w-8 h-8 flex items-center justify-center font-bold text-lg">
+                        ${medals[index] || `#${item.rank}`}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-gray-800 truncate">${item.player_name}</p>
+                    </div>
+                    <div class="font-bold text-indigo-600">${item.score} 分</div>
+                </div>
+            `).join('');
+        }
+
+        function updateState(state) {
+            if (!state) return;
+
+            if (state.room) {
+                document.getElementById('roundNum').textContent = state.room.round || 0;
+                document.getElementById('currentRound').textContent = state.room.round || 1;
+
+                if (state.room.status === 'active' && state.room.current_question) {
+                    showQuestionActive(state.room.current_question);
+                } else {
+                    showQuestionInput();
+                }
+            }
+
+            if (state.players) {
+                updatePlayers(state.players);
+            }
+
+            if (state.leaderboard) {
+                updateLeaderboard(state.leaderboard);
+            }
+        }
+
+        function showQuestionActive(question) {
+            document.getElementById('questionInputArea').classList.add('hidden');
+            document.getElementById('questionActiveArea').classList.remove('hidden');
+            document.getElementById('currentQuestionText').textContent = question;
+            document.getElementById('buzzResultArea').classList.add('hidden');
+            startCountdown();
+        }
+
+        function showQuestionInput() {
+            document.getElementById('questionInputArea').classList.remove('hidden');
+            document.getElementById('questionActiveArea').classList.add('hidden');
+            stopCountdown();
+        }
+
+        function startCountdown() {
+            stopCountdown();
+            countdownValue = 10;
+            document.getElementById('buzzCountdown').textContent = countdownValue;
+
+            countdownTimer = setInterval(() => {
+                countdownValue--;
+                document.getElementById('buzzCountdown').textContent = countdownValue;
+
+                if (countdownValue <= 0) {
+                    stopCountdown();
+                }
+            }, 1000);
+        }
+
+        function stopCountdown() {
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+        }
+
+        function initSocket() {
+            socket = io();
+
+            socket.on('connect', () => {
+                addLog('已连接到服务器', 'success');
+                socket.emit('join', {
+                    room_id: roomId,
+                    user_type: 'host',
+                    player_name: hostName
+                });
+            });
+
+            socket.on('disconnect', () => {
+                addLog('与服务器断开连接', 'error');
+            });
+
+            socket.on('joined', (data) => {
+                addLog(`您已作为主持人加入房间`, 'success');
+                updateState(data.state);
+            });
+
+            socket.on('player_joined', (data) => {
+                addLog(`玩家 ${data.player_name} 加入了房间`, 'info');
+                updateState(data.state);
+            });
+
+            socket.on('player_left', (data) => {
+                addLog(`玩家 ${data.player_name} 离开了房间`, 'warning');
+                updateState(data.state);
+            });
+
+            socket.on('question_started', (data) => {
+                addLog(`第 ${data.round} 轮抢答开始`, 'info');
+                updateState(data.state);
+            });
+
+            socket.on('buzz_winner', (data) => {
+                stopCountdown();
+                document.getElementById('buzzWinner').textContent = data.winner.player_name;
+                document.getElementById('buzzResultArea').classList.remove('hidden');
+                addLog(`${data.winner.player_name} 第一个抢答！`, 'buzz');
+                showToast(`${data.winner.player_name} 抢到了！`, 'success');
+            });
+
+            socket.on('question_ended', (data) => {
+                stopCountdown();
+                if (data.result) {
+                    const action = data.correct ? '回答正确，+1分' : '回答错误，不得分';
+                    addLog(`${data.result.player_name} ${action}`, data.correct ? 'success' : 'error');
+                } else {
+                    addLog('本轮无人抢答', 'warning');
+                }
+                updateState(data.state);
+            });
+
+            socket.on('room_reset', (data) => {
+                addLog('房间已重置', 'info');
+                updateState(data.state);
+            });
+
+            socket.on('state_update', (data) => {
+                updateState(data.state);
+            });
+
+            socket.on('error', (data) => {
+                showToast(data.message, 'error');
+                addLog(data.message, 'error');
+            });
+        }
+
+        function startQuestion() {
+            const question = document.getElementById('questionText').value.trim();
+            if (!question) {
+                showToast('请输入题目内容', 'error');
+                return;
+            }
+
+            socket.emit('start_question', {
+                room_id: roomId,
+                question: question
+            });
+        }
+
+        function endQuestion(correct) {
+            socket.emit('end_question', {
+                room_id: roomId,
+                correct: correct
+            });
+        }
+
+        function resetRoom() {
+            if (confirm('确定要重置房间吗？所有分数将被清空。')) {
+                socket.emit('reset_room', {
+                    room_id: roomId
+                });
+                document.getElementById('questionText').value = '';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initSocket();
+            addLog('欢迎使用在线抢答系统', 'info');
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (socket) {
+                socket.emit('leave', {
+                    room_id: roomId,
+                    player_name: hostName
+                });
+            }
+        });
+    </script>
+</body>
+</html>

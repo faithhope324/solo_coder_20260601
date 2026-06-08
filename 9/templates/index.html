@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>口罩佩戴检测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M8 11h8M8 8h8"/>
+                </svg>
+                <h1>口罩佩戴检测系统</h1>
+            </div>
+            <div class="model-badge" id="modelBadge">检测模式: {{ model_status }}</div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="tabs">
+            <button class="tab active" data-tab="upload" onclick="switchTab('upload')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                    <path d="M21 15l-5-5L5 21"/>
+                </svg>
+                图片检测
+            </button>
+            <button class="tab" data-tab="camera" onclick="switchTab('camera')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+                摄像头检测
+            </button>
+        </div>
+
+        <!-- 图片检测 -->
+        <section id="tab-upload" class="tab-content active">
+            <div class="card">
+                <div class="upload-zone" id="uploadZone">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p class="upload-text">拖拽图片到此处 或 点击选择图片</p>
+                    <p class="upload-hint">支持 JPG / PNG / BMP 格式</p>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                </div>
+            </div>
+
+            <div class="result-area" id="uploadResult" style="display:none;">
+                <div class="card">
+                    <h3>检测结果</h3>
+                    <div class="result-image-wrap">
+                        <img id="resultImage" src="" alt="检测结果">
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card stat-total">
+                        <span class="stat-value" id="statTotal">0</span>
+                        <span class="stat-label">检测人数</span>
+                    </div>
+                    <div class="stat-card stat-mask">
+                        <span class="stat-value" id="statMask">0</span>
+                        <span class="stat-label">已戴口罩</span>
+                    </div>
+                    <div class="stat-card stat-nomask">
+                        <span class="stat-value" id="statNoMask">0</span>
+                        <span class="stat-label">未戴口罩</span>
+                    </div>
+                </div>
+                <div class="card" id="faceDetailCard" style="display:none;">
+                    <h3>详细信息</h3>
+                    <div id="faceDetails" class="face-details"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 摄像头检测 -->
+        <section id="tab-camera" class="tab-content">
+            <div class="card">
+                <div class="camera-controls">
+                    <button class="btn btn-primary" id="btnStartCam" onclick="startCamera()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        开启摄像头
+                    </button>
+                    <button class="btn btn-danger" id="btnStopCam" onclick="stopCamera()" style="display:none;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="6" y="6" width="12" height="12"/>
+                        </svg>
+                        关闭摄像头
+                    </button>
+                    <button class="btn btn-secondary" id="btnCapture" onclick="captureFrame()" style="display:none;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        截图检测
+                    </button>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoDetect"> 自动检测
+                    </label>
+                </div>
+
+                <div class="camera-view" id="cameraView" style="display:none;">
+                    <div class="video-container">
+                        <video id="webcamVideo" autoplay playsinline muted></video>
+                        <canvas id="overlayCanvas" style="display:none;"></canvas>
+                        <img id="streamImage" src="" alt="" style="display:none;">
+                    </div>
+                </div>
+
+                <div class="camera-placeholder" id="cameraPlaceholder">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                    <p>点击"开启摄像头"开始实时检测</p>
+                </div>
+            </div>
+
+            <div class="result-area" id="cameraResult" style="display:none;">
+                <div class="stats-grid">
+                    <div class="stat-card stat-total">
+                        <span class="stat-value" id="camStatTotal">0</span>
+                        <span class="stat-label">检测人数</span>
+                    </div>
+                    <div class="stat-card stat-mask">
+                        <span class="stat-value" id="camStatMask">0</span>
+                        <span class="stat-label">已戴口罩</span>
+                    </div>
+                    <div class="stat-card stat-nomask">
+                        <span class="stat-value" id="camStatNoMask">0</span>
+                        <span class="stat-label">未戴口罩</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+        <div class="spinner"></div>
+        <p>正在检测中...</p>
+    </div>
+
+    <script>
+        let webcamStream = null;
+        let autoDetectInterval = null;
+        let isProcessing = false;
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        // ============ 图片上传 ============
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) { alert('请选择图片文件'); return; }
+            const formData = new FormData();
+            formData.append('file', file);
+            detectImage(formData);
+        }
+
+        async function detectImage(formData) {
+            showLoading(true);
+            try {
+                const resp = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                showUploadResult(data);
+            } catch (e) {
+                alert('检测失败: ' + e.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function showUploadResult(data) {
+            document.getElementById('resultImage').src = data.image;
+            document.getElementById('statTotal').textContent = data.count;
+            document.getElementById('statMask').textContent = data.mask_count;
+            document.getElementById('statNoMask').textContent = data.no_mask_count;
+
+            const detailCard = document.getElementById('faceDetailCard');
+            const details = document.getElementById('faceDetails');
+            if (data.faces.length > 0) {
+                detailCard.style.display = 'block';
+                details.innerHTML = data.faces.map((f, i) => `
+                    <div class="face-item ${f.has_mask ? 'face-mask' : 'face-nomask'}">
+                        <span class="face-index">#${i + 1}</span>
+                        <span class="face-status">${f.has_mask ? '戴口罩' : '未戴口罩'}</span>
+                        <span class="face-conf">${(f.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                `).join('');
+            } else {
+                detailCard.style.display = 'none';
+            }
+
+            document.getElementById('uploadResult').style.display = 'flex';
+        }
+
+        // ============ 摄像头 ============
+        async function startCamera() {
+            try {
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+                });
+                const video = document.getElementById('webcamVideo');
+                video.srcObject = webcamStream;
+                video.style.display = 'block';
+                document.getElementById('cameraView').style.display = 'block';
+                document.getElementById('cameraPlaceholder').style.display = 'none';
+                document.getElementById('btnStartCam').style.display = 'none';
+                document.getElementById('btnStopCam').style.display = 'inline-flex';
+                document.getElementById('btnCapture').style.display = 'inline-flex';
+                document.getElementById('cameraResult').style.display = 'flex';
+            } catch (e) {
+                alert('无法访问摄像头: ' + e.message);
+            }
+        }
+
+        function stopCamera() {
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(t => t.stop());
+                webcamStream = null;
+            }
+            if (autoDetectInterval) {
+                clearInterval(autoDetectInterval);
+                autoDetectInterval = null;
+            }
+            const video = document.getElementById('webcamVideo');
+            video.srcObject = null;
+            video.style.display = 'none';
+            document.getElementById('cameraView').style.display = 'none';
+            document.getElementById('cameraPlaceholder').style.display = 'flex';
+            document.getElementById('btnStartCam').style.display = 'inline-flex';
+            document.getElementById('btnStopCam').style.display = 'none';
+            document.getElementById('btnCapture').style.display = 'none';
+            document.getElementById('cameraResult').style.display = 'none';
+            document.getElementById('autoDetect').checked = false;
+        }
+
+        document.getElementById('autoDetect').addEventListener('change', function () {
+            if (this.checked && webcamStream) {
+                autoDetectInterval = setInterval(autoDetect, 400);
+            } else {
+                if (autoDetectInterval) { clearInterval(autoDetectInterval); autoDetectInterval = null; }
+            }
+        });
+
+        async function autoDetect() {
+            if (isProcessing) return;
+            isProcessing = true;
+            try {
+                const video = document.getElementById('webcamVideo');
+                const canvas = document.getElementById('overlayCanvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
+                const formData = new FormData();
+                formData.append('file', blob, 'frame.jpg');
+
+                const resp = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (!data.error) {
+                    const img = document.getElementById('streamImage');
+                    img.src = data.image;
+                    img.style.display = 'block';
+                    document.getElementById('webcamVideo').style.display = 'none';
+                    document.getElementById('camStatTotal').textContent = data.count;
+                    document.getElementById('camStatMask').textContent = data.mask_count;
+                    document.getElementById('camStatNoMask').textContent = data.no_mask_count;
+                }
+            } catch (e) { /* ignore auto-detect errors */ }
+            finally { isProcessing = false; }
+        }
+
+        async function captureFrame() {
+            if (!webcamStream) return;
+            showLoading(true);
+            try {
+                const video = document.getElementById('webcamVideo');
+                const canvas = document.getElementById('overlayCanvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+                const formData = new FormData();
+                formData.append('file', blob, 'capture.jpg');
+
+                const resp = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+
+                const img = document.getElementById('streamImage');
+                img.src = data.image;
+                img.style.display = 'block';
+                document.getElementById('webcamVideo').style.display = 'none';
+                document.getElementById('camStatTotal').textContent = data.count;
+                document.getElementById('camStatMask').textContent = data.mask_count;
+                document.getElementById('camStatNoMask').textContent = data.no_mask_count;
+            } catch (e) {
+                alert('截图检测失败: ' + e.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+        }
+    </script>
+</body>
+</html>

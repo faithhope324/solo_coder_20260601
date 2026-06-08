@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ 秒杀抢购</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/seckill.css">
+</head>
+<body>
+    <div id="app">
+        <nav class="topbar">
+            <div class="topbar-inner">
+                <div class="brand">
+                    <span class="brand-icon">⚡</span>
+                    <span class="brand-text">秒杀系统</span>
+                </div>
+                <div class="user-info">
+                    <span class="user-name" id="userName"></span>
+                    <button class="logout-btn" id="logoutBtn">退出</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="fire-icon">🔥</span>
+                    限时秒杀
+                    <span class="fire-icon">🔥</span>
+                </h2>
+                <p class="section-sub">手慢无 · 先到先得 · 每人每秒限抢一次</p>
+            </div>
+
+            <div class="products-grid" id="productsGrid">
+                <div class="skeleton-card" style="height:320px"></div>
+                <div class="skeleton-card" style="height:320px"></div>
+                <div class="skeleton-card" style="height:320px"></div>
+            </div>
+
+            <div class="orders-section" id="ordersSection" style="display:none">
+                <button class="orders-toggle" id="ordersToggle">
+                    <span>📦 我的订单</span>
+                    <span class="toggle-arrow" id="toggleArrow">▼</span>
+                </button>
+                <div class="orders-panel hidden" id="ordersPanel">
+                    <div id="ordersList" class="orders-list"></div>
+                </div>
+            </div>
+        </main>
+
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+    <script src="/static/js/seckill.js"></script>
+</body>
+</html>

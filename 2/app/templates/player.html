@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>玩家端 - 在线抢答系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        @keyframes bounce-in {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .buzz-active {
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        .bounce-in {
+            animation: bounce-in 0.5s ease-out;
+        }
+        .buzz-btn {
+            transition: all 0.1s ease;
+        }
+        .buzz-btn:active {
+            transform: scale(0.95);
+        }
+        .buzz-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div class="bg-black/30 backdrop-blur-sm border-b border-white/10 py-4 px-6">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <a href="/" class="flex items-center space-x-2 hover:opacity-80 transition-opacity text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span class="font-bold">抢答系统</span>
+                </a>
+                <span class="text-white/40">|</span>
+                <span class="text-white/70">房间号：<span class="font-mono font-bold text-white tracking-wider">{{ room_id }}</span></span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+                    <span class="text-white/60 text-sm">我是：</span>
+                    <span id="myName" class="font-bold">玩家</span>
+                </div>
+                <div id="myRank" class="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg px-4 py-2 text-white font-bold hidden">
+                    第 <span id="myRankNum">1</span> 名
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="mb-6">
+            <div id="questionCard" class="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20">
+                <div class="flex items-center justify-between mb-6">
+                    <div id="statusBadge" class="flex items-center space-x-2">
+                        <span class="w-3 h-3 bg-gray-400 rounded-full"></span>
+                        <span class="text-white/70">等待出题...</span>
+                    </div>
+                    <div id="roundInfo" class="text-white/60 text-sm">
+                        第 <span id="currentRound" class="font-bold text-white">0</span> 轮
+                    </div>
+                </div>
+                <h2 id="questionText" class="text-3xl font-bold text-white text-center leading-relaxed min-h-[80px] flex items-center justify-center">
+                    等待主持人出题...
+                </h2>
+            </div>
+        </div>
+
+        <div id="buzzResultBanner" class="hidden mb-6">
+            <div class="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-md rounded-2xl p-6 border border-yellow-500/30">
+                <div class="flex items-center justify-center space-x-4">
+                    <div class="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white text-4xl shadow-lg bounce-in">
+                        🏆
+                    </div>
+                    <div class="text-center">
+                        <p class="text-yellow-300 text-sm font-medium">第一位抢答者</p>
+                        <p id="buzzWinnerName" class="text-3xl font-bold text-white"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="myResultBanner" class="hidden mb-6">
+            <div id="myResultCard" class="backdrop-blur-md rounded-2xl p-6 border">
+                <div class="flex items-center justify-center space-x-4">
+                    <div id="myResultIcon" class="w-16 h-16 rounded-full flex items-center justify-center text-white text-4xl shadow-lg bounce-in"></div>
+                    <div class="text-center">
+                        <p id="myResultTitle" class="text-sm font-medium"></p>
+                        <p id="myResultText" class="text-2xl font-bold text-white"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <div class="flex justify-center">
+                <div class="relative">
+                    <div id="buzzPulse" class="absolute inset-0 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full opacity-0 buzz-active"></div>
+                    <button id="buzzBtn" onclick="buzz()" disabled
+                        class="buzz-btn relative w-64 h-64 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 text-white text-4xl font-bold shadow-2xl disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed border-8 border-gray-500/50">
+                        <div class="flex flex-col items-center justify-center">
+                            <svg class="w-16 h-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                            </svg>
+                            <span id="buzzBtnText">准备</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <p id="buzzHint" class="text-center text-white/50 mt-4">
+                等待题目出现后，立即点击按钮抢答！
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+                <h3 class="text-lg font-bold text-white mb-4 flex items-center">
+                    <span class="w-8 h-8 bg-yellow-500/20 text-yellow-400 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </span>
+                    实时排行榜
+                </h3>
+                <div id="leaderboard" class="space-y-3 max-h-80 overflow-y-auto">
+                    <div class="text-center py-8 text-white/40">暂无得分</div>
+                </div>
+            </div>
+
+            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+                <h3 class="text-lg font-bold text-white mb-4 flex items-center">
+                    <span class="w-8 h-8 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </span>
+                    在线玩家 <span id="playerCount" class="ml-auto text-sm font-normal text-white/50">0 人</span>
+                </h3>
+                <div id="playersList" class="grid grid-cols-3 gap-3">
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+            <h3 class="text-lg font-bold text-white mb-4 flex items-center">
+                <span class="w-8 h-8 bg-green-500/20 text-green-400 rounded-lg flex items-center justify-center mr-3">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </span>
+                活动日志
+            </h3>
+            <div id="activityLog" class="space-y-2 max-h-48 overflow-y-auto">
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 -translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="bg-white/95 backdrop-blur-sm px-8 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 border border-white/20">
+            <span id="toastIcon" class="text-2xl"></span>
+            <span id="toastMessage" class="font-medium text-gray-800"></span>
+        </div>
+    </div>
+
+    <script>
+        const roomId = '{{ room_id }}';
+        const playerData = JSON.parse(localStorage.getItem(`player_${roomId}`) || '{}');
+        const playerId = playerData.player_id || '';
+        const playerName = playerData.player_name || '玩家';
+
+        let socket = null;
+        let canBuzz = false;
+        let hasBuzzed = false;
+        let isQuestionActive = false;
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
+
+            const icons = {
+                success: '✅',
+                error: '❌',
+                info: 'ℹ️',
+                warning: '⚠️',
+                buzz: '⚡'
+            };
+
+            toastIcon.textContent = icons[type] || icons.info;
+            toastMessage.textContent = message;
+
+            toast.classList.remove('-translate-y-20', 'opacity-0');
+            toast.classList.add('-translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.add('-translate-y-20', 'opacity-0');
+                toast.classList.remove('-translate-y-0', 'opacity-100');
+            }, 2500);
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('activityLog');
+            const time = new Date().toLocaleTimeString();
+            const colors = {
+                success: 'text-green-400 bg-green-500/10',
+                error: 'text-red-400 bg-red-500/10',
+                info: 'text-blue-400 bg-blue-500/10',
+                warning: 'text-yellow-400 bg-yellow-500/10',
+                buzz: 'text-purple-400 bg-purple-500/10'
+            };
+
+            const entry = document.createElement('div');
+            entry.className = `text-sm px-3 py-2 rounded-lg ${colors[type] || colors.info}`;
+            entry.innerHTML = `<span class="opacity-60">[${time}]</span> ${message}`;
+            log.insertBefore(entry, log.firstChild);
+
+            while (log.children.length > 30) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function updatePlayers(players) {
+            const list = document.getElementById('playersList');
+            document.getElementById('playerCount').textContent = `${players.length} 人`;
+
+            if (players.length === 0) {
+                list.innerHTML = '<div class="col-span-full text-center py-4 text-white/40">暂无玩家</div>';
+                return;
+            }
+
+            list.innerHTML = players.map(player => {
+                const isMe = player.player_id === playerId;
+                return `
+                    <div class="rounded-xl p-3 text-center ${isMe ? 'bg-gradient-to-br from-pink-500/30 to-purple-500/30 border border-pink-500/30' : 'bg-white/5'}">
+                        <div class="w-10 h-10 ${isMe ? 'bg-gradient-to-br from-pink-400 to-purple-500' : 'bg-gradient-to-br from-blue-400 to-indigo-500'} rounded-full mx-auto mb-1 flex items-center justify-center text-white font-bold text-sm">
+                            ${player.player_name.charAt(0)}
+                        </div>
+                        <p class="text-xs text-white/80 truncate">${player.player_name}${isMe ? ' (我)' : ''}</p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard');
+
+            if (leaderboard.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-white/40">暂无得分</div>';
+                return;
+            }
+
+            const medals = ['🥇', '🥈', '🥉'];
+            let myRank = null;
+
+            container.innerHTML = leaderboard.map((item, index) => {
+                const isMe = item.player_id === playerId;
+                if (isMe) {
+                    myRank = item.rank;
+                }
+                return `
+                    <div class="flex items-center space-x-3 p-3 rounded-xl ${isMe ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30' : 'bg-white/5'} ${index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30' : ''}">
+                        <div class="w-8 h-8 flex items-center justify-center font-bold text-lg">
+                            ${medals[index] || `#${item.rank}`}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-white truncate">${item.player_name}${isMe ? ' (我)' : ''}</p>
+                        </div>
+                        <div class="font-bold ${index === 0 ? 'text-yellow-400' : 'text-white'}">${item.score} 分</div>
+                    </div>
+                `;
+            }).join('');
+
+            if (myRank) {
+                document.getElementById('myRank').classList.remove('hidden');
+                document.getElementById('myRankNum').textContent = myRank;
+            }
+        }
+
+        function updateState(state) {
+            if (!state) return;
+
+            if (state.room) {
+                document.getElementById('currentRound').textContent = state.room.round || 0;
+
+                if (state.room.status === 'active' && state.room.current_question) {
+                    showQuestion(state.room.current_question);
+                } else {
+                    hideQuestion();
+                }
+            }
+
+            if (state.players) {
+                updatePlayers(state.players);
+            }
+
+            if (state.leaderboard) {
+                updateLeaderboard(state.leaderboard);
+            }
+        }
+
+        function showQuestion(question) {
+            isQuestionActive = true;
+            hasBuzzed = false;
+            canBuzz = true;
+
+            const questionCard = document.getElementById('questionCard');
+            const statusBadge = document.getElementById('statusBadge');
+            const questionText = document.getElementById('questionText');
+            const buzzBtn = document.getElementById('buzzBtn');
+            const buzzBtnText = document.getElementById('buzzBtnText');
+            const buzzPulse = document.getElementById('buzzPulse');
+            const buzzHint = document.getElementById('buzzHint');
+            const buzzResultBanner = document.getElementById('buzzResultBanner');
+            const myResultBanner = document.getElementById('myResultBanner');
+
+            questionCard.classList.remove('bg-white/10');
+            questionCard.classList.add('bg-gradient-to-r', 'from-pink-500/20', 'to-purple-500/20', 'border-pink-500/30');
+
+            statusBadge.innerHTML = `
+                <span class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></span>
+                <span class="text-green-400 font-medium">抢答中！</span>
+            `;
+
+            questionText.textContent = question;
+            questionText.classList.add('bounce-in');
+            setTimeout(() => questionText.classList.remove('bounce-in'), 500);
+
+            buzzBtn.disabled = false;
+            buzzBtn.classList.remove('from-gray-600', 'to-gray-700', 'border-gray-500/50');
+            buzzBtn.classList.add('from-pink-500', 'to-rose-600', 'border-pink-400/50');
+            buzzBtnText.textContent = '抢答！';
+
+            buzzPulse.style.opacity = '0.6';
+
+            buzzHint.textContent = '快！点击按钮抢答！';
+            buzzHint.classList.remove('text-white/50');
+            buzzHint.classList.add('text-yellow-400');
+
+            buzzResultBanner.classList.add('hidden');
+            myResultBanner.classList.add('hidden');
+
+            showToast('题目来了！快抢答！', 'buzz');
+        }
+
+        function hideQuestion() {
+            isQuestionActive = false;
+            canBuzz = false;
+
+            const questionCard = document.getElementById('questionCard');
+            const statusBadge = document.getElementById('statusBadge');
+            const questionText = document.getElementById('questionText');
+            const buzzBtn = document.getElementById('buzzBtn');
+            const buzzBtnText = document.getElementById('buzzBtnText');
+            const buzzPulse = document.getElementById('buzzPulse');
+            const buzzHint = document.getElementById('buzzHint');
+
+            questionCard.classList.add('bg-white/10');
+            questionCard.classList.remove('bg-gradient-to-r', 'from-pink-500/20', 'to-purple-500/20', 'border-pink-500/30');
+
+            statusBadge.innerHTML = `
+                <span class="w-3 h-3 bg-gray-400 rounded-full"></span>
+                <span class="text-white/70">等待出题...</span>
+            `;
+
+            questionText.textContent = '等待主持人出题...';
+
+            buzzBtn.disabled = true;
+            buzzBtn.classList.add('from-gray-600', 'to-gray-700', 'border-gray-500/50');
+            buzzBtn.classList.remove('from-pink-500', 'to-rose-600', 'border-pink-400/50');
+            buzzBtnText.textContent = '准备';
+
+            buzzPulse.style.opacity = '0';
+
+            buzzHint.textContent = '等待题目出现后，立即点击按钮抢答！';
+            buzzHint.classList.add('text-white/50');
+            buzzHint.classList.remove('text-yellow-400');
+        }
+
+        function showBuzzWinner(winner) {
+            const buzzResultBanner = document.getElementById('buzzResultBanner');
+            const buzzWinnerName = document.getElementById('buzzWinnerName');
+
+            buzzWinnerName.textContent = winner.player_name;
+            buzzResultBanner.classList.remove('hidden');
+
+            if (winner.player_id === playerId) {
+                showMyResult(true);
+            } else {
+                showMyResult(false, winner.player_name);
+            }
+
+            const buzzBtn = document.getElementById('buzzBtn');
+            const buzzBtnText = document.getElementById('buzzBtnText');
+            buzzBtn.disabled = true;
+            buzzBtn.classList.add('from-gray-600', 'to-gray-700', 'border-gray-500/50');
+            buzzBtn.classList.remove('from-pink-500', 'to-rose-600', 'border-pink-400/50');
+            buzzBtnText.textContent = '已结束';
+
+            document.getElementById('buzzPulse').style.opacity = '0';
+        }
+
+        function showMyResult(isWinner, winnerName = '') {
+            const myResultBanner = document.getElementById('myResultBanner');
+            const myResultCard = document.getElementById('myResultCard');
+            const myResultIcon = document.getElementById('myResultIcon');
+            const myResultTitle = document.getElementById('myResultTitle');
+            const myResultText = document.getElementById('myResultText');
+
+            myResultBanner.classList.remove('hidden');
+
+            if (isWinner) {
+                myResultCard.className = 'backdrop-blur-md rounded-2xl p-6 border bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30';
+                myResultIcon.className = 'w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center text-white text-4xl shadow-lg bounce-in';
+                myResultIcon.textContent = '🎉';
+                myResultTitle.className = 'text-sm font-medium text-green-300';
+                myResultTitle.textContent = '恭喜你！';
+                myResultText.textContent = '你抢到了答题权！';
+            } else {
+                myResultCard.className = 'backdrop-blur-md rounded-2xl p-6 border bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-500/30';
+                myResultIcon.className = 'w-16 h-16 bg-gradient-to-br from-red-400 to-rose-500 rounded-full flex items-center justify-center text-white text-4xl shadow-lg bounce-in';
+                myResultIcon.textContent = '😢';
+                myResultTitle.className = 'text-sm font-medium text-red-300';
+                myResultTitle.textContent = '慢了一步';
+                myResultText.textContent = `${winnerName} 比你更快！`;
+            }
+        }
+
+        function buzz() {
+            if (!canBuzz || hasBuzzed || !isQuestionActive) {
+                return;
+            }
+
+            hasBuzzed = true;
+            canBuzz = false;
+
+            const buzzBtn = document.getElementById('buzzBtn');
+            buzzBtn.classList.add('shake');
+            setTimeout(() => buzzBtn.classList.remove('shake'), 500);
+
+            socket.emit('buzz', {
+                room_id: roomId,
+                player_id: playerId,
+                player_name: playerName
+            });
+
+            addLog('你点击了抢答！', 'buzz');
+        }
+
+        function initSocket() {
+            if (!playerId || !playerName) {
+                window.location.href = '/';
+                return;
+            }
+
+            document.getElementById('myName').textContent = playerName;
+
+            socket = io();
+
+            socket.on('connect', () => {
+                addLog('已连接到服务器', 'success');
+                socket.emit('join', {
+                    room_id: roomId,
+                    user_type: 'player',
+                    player_id: playerId,
+                    player_name: playerName
+                });
+            });
+
+            socket.on('disconnect', () => {
+                addLog('与服务器断开连接', 'error');
+                showToast('连接断开，请刷新页面', 'error');
+            });
+
+            socket.on('joined', (data) => {
+                addLog(`你已加入房间`, 'success');
+                updateState(data.state);
+            });
+
+            socket.on('player_joined', (data) => {
+                if (data.player_id !== playerId) {
+                    addLog(`玩家 ${data.player_name} 加入了房间`, 'info');
+                }
+                updateState(data.state);
+            });
+
+            socket.on('player_left', (data) => {
+                addLog(`玩家 ${data.player_name} 离开了房间`, 'warning');
+                updateState(data.state);
+            });
+
+            socket.on('question_started', (data) => {
+                addLog(`第 ${data.round} 轮抢答开始！`, 'info');
+                updateState(data.state);
+            });
+
+            socket.on('buzz_winner', (data) => {
+                showBuzzWinner(data.winner);
+                if (data.winner.player_id !== playerId) {
+                    addLog(`${data.winner.player_name} 第一个抢答！`, 'buzz');
+                }
+                updateState(data.state);
+            });
+
+            socket.on('buzz_result', (data) => {
+                if (data.player_id === playerId) {
+                    if (data.is_first) {
+                        showToast('你抢到了！🎉', 'success');
+                        addLog('恭喜！你是第一个抢答的！', 'success');
+                    } else if (data.first_player_name) {
+                        showToast(`慢了！${data.first_player_name} 更快`, 'error');
+                    }
+                }
+            });
+
+            socket.on('question_ended', (data) => {
+                if (data.result) {
+                    const action = data.correct ? '回答正确，+1分' : '回答错误，不得分';
+                    if (data.result.player_id === playerId) {
+                        addLog(`你${action}`, data.correct ? 'success' : 'error');
+                    } else {
+                        addLog(`${data.result.player_name} ${action}`, data.correct ? 'info' : 'warning');
+                    }
+                } else {
+                    addLog('本轮无人抢答', 'warning');
+                }
+                updateState(data.state);
+                hideQuestion();
+            });
+
+            socket.on('room_reset', (data) => {
+                addLog('房间已重置', 'info');
+                updateState(data.state);
+                hideQuestion();
+            });
+
+            socket.on('state_update', (data) => {
+                updateState(data.state);
+            });
+
+            socket.on('error', (data) => {
+                showToast(data.message, 'error');
+                addLog(data.message, 'error');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initSocket();
+            addLog('欢迎使用在线抢答系统', 'info');
+
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' || e.key === ' ') {
+                    e.preventDefault();
+                    buzz();
+                }
+            });
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (socket) {
+                socket.emit('leave', {
+                    room_id: roomId,
+                    player_id: playerId,
+                    player_name: playerName
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>垃圾分类智能识别系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🗑️ 垃圾分类智能识别系统</h1>
+            <p class="subtitle">上传图片，AI 自动识别垃圾类别并推荐相似图片</p>
+        </header>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📷</div>
+                    <p class="upload-text">点击或拖拽图片到此处上传</p>
+                    <p class="upload-hint">支持 JPG、PNG、GIF、BMP 格式</p>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                </div>
+                <button class="btn-analyze" id="analyzeBtn" disabled>开始识别</button>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="preview-card">
+                    <h3>上传图片</h3>
+                    <div class="image-container">
+                        <img id="previewImage" src="" alt="预览图片">
+                    </div>
+                </div>
+
+                <div class="classification-card">
+                    <h3>识别结果</h3>
+                    <div id="classificationResults"></div>
+                </div>
+
+                <div class="similar-card">
+                    <h3>相似图片推荐</h3>
+                    <div id="similarImages" class="similar-grid"></div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>AI 正在分析中...</p>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h2>垃圾分类指南</h2>
+            <div class="waste-types">
+                <div class="waste-card recyclable">
+                    <div class="waste-icon">♻️</div>
+                    <h3>可回收物</h3>
+                    <p>废纸、塑料、玻璃、金属、布料等</p>
+                </div>
+                <div class="waste-card kitchen">
+                    <div class="waste-icon">🥬</div>
+                    <h3>厨余垃圾</h3>
+                    <p>剩菜剩饭、果皮、菜叶、骨头等</p>
+                </div>
+                <div class="waste-card hazardous">
+                    <div class="waste-icon">☠️</div>
+                    <h3>有害垃圾</h3>
+                    <p>废电池、废灯管、过期药品等</p>
+                </div>
+                <div class="waste-card other">
+                    <div class="waste-icon">🗑️</div>
+                    <h3>其他垃圾</h3>
+                    <p>砖瓦陶瓷、渣土、卫生间废纸等</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>© 2024 垃圾分类智能识别系统 | 保护环境，从分类开始</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

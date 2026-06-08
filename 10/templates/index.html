@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>足球赛事数据分析</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .header {
+            background: rgba(0,0,0,0.4);
+            padding: 24px 0;
+            text-align: center;
+            border-bottom: 2px solid #2ecc71;
+        }
+        .header h1 {
+            font-size: 2.2em;
+            color: #2ecc71;
+            letter-spacing: 2px;
+        }
+        .header p {
+            color: #95a5a6;
+            margin-top: 6px;
+            font-size: 0.95em;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .section h2 {
+            color: #2ecc71;
+            margin-bottom: 18px;
+            font-size: 1.4em;
+            border-left: 4px solid #2ecc71;
+            padding-left: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        th {
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+            padding: 10px 8px;
+            text-align: center;
+            font-weight: 600;
+            border-bottom: 2px solid rgba(46, 204, 113, 0.3);
+        }
+        td {
+            padding: 9px 8px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        tr:hover td {
+            background: rgba(46, 204, 113, 0.06);
+        }
+        .rank-1 td { color: #f1c40f; font-weight: 700; }
+        .rank-2 td { color: #bdc3c7; font-weight: 600; }
+        .rank-3 td { color: #e67e22; font-weight: 600; }
+        .positive { color: #2ecc71; }
+        .negative { color: #e74c3c; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        @media (max-width: 900px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+        .chart-box {
+            text-align: center;
+        }
+        .chart-box img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .chart-box.full {
+            grid-column: 1 / -1;
+        }
+        .predict-form {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .predict-form label {
+            font-weight: 600;
+            color: #2ecc71;
+            min-width: 40px;
+        }
+        .predict-form select {
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+            background: rgba(0,0,0,0.3);
+            color: #e0e0e0;
+            font-size: 1em;
+            min-width: 180px;
+            cursor: pointer;
+        }
+        .predict-form select:focus {
+            outline: none;
+            border-color: #2ecc71;
+        }
+        .predict-form button {
+            padding: 10px 28px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: #fff;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .predict-form button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+        }
+        .predict-result {
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        .predict-result.show {
+            display: block;
+        }
+        .result-card {
+            display: inline-block;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(46, 204, 113, 0.2);
+            border-radius: 12px;
+            padding: 20px 36px;
+        }
+        .result-card .prediction-label {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #2ecc71;
+            margin-bottom: 12px;
+        }
+        .prob-bar-container {
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .prob-bar-container span {
+            min-width: 90px;
+            text-align: right;
+            font-size: 0.9em;
+        }
+        .prob-bar {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            height: 20px;
+            overflow: hidden;
+            max-width: 250px;
+        }
+        .prob-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .prob-fill.home { background: linear-gradient(90deg, #2ecc71, #27ae60); }
+        .prob-fill.draw { background: linear-gradient(90deg, #f39c12, #e67e22); }
+        .prob-fill.away { background: linear-gradient(90deg, #e74c3c, #c0392b); }
+        .prob-value {
+            font-weight: 600;
+            min-width: 50px;
+        }
+        .accuracy-badge {
+            display: inline-block;
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+        .error-msg {
+            color: #e74c3c;
+            margin-top: 10px;
+            display: none;
+        }
+        .error-msg.show {
+            display: block;
+        }
+        .index-badges {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .offense-high { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+        .offense-mid  { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
+        .offense-low  { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+        .defense-high { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+        .defense-mid  { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
+        .defense-low  { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚽ 足球赛事数据分析</h1>
+        <p>球队表现 &middot; 主客场分析 &middot; 比赛预测</p>
+    </div>
+
+    <div class="container">
+        <!-- Standings -->
+        <div class="section">
+            <h2>联赛积分榜与攻防指数</h2>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>球队</th>
+                            <th>场次</th>
+                            <th>胜</th>
+                            <th>平</th>
+                            <th>负</th>
+                            <th>进球</th>
+                            <th>失球</th>
+                            <th>净胜</th>
+                            <th>积分</th>
+                            <th>控球%</th>
+                            <th>射门</th>
+                            <th>进攻</th>
+                            <th>防守</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in standings %}
+                        <tr class="rank-{{ t.rank }}">
+                            <td>{{ t.rank }}</td>
+                            <td style="text-align:left;font-weight:600;">{{ t.team }}</td>
+                            <td>{{ t.played }}</td>
+                            <td>{{ t.wins }}</td>
+                            <td>{{ t.draws }}</td>
+                            <td>{{ t.losses }}</td>
+                            <td>{{ t.goals_scored }}</td>
+                            <td>{{ t.goals_conceded }}</td>
+                            <td class="{{ 'positive' if t.goal_diff > 0 else 'negative' if t.goal_diff < 0 else '' }}">
+                                {{ '+' + t.goal_diff|string if t.goal_diff > 0 else t.goal_diff }}
+                            </td>
+                            <td style="font-weight:700;">{{ t.points }}</td>
+                            <td>{{ t.avg_possession }}%</td>
+                            <td>{{ t.avg_shots }}</td>
+                            <td><span class="index-badges {{ 'offense-high' if t.offensive_index > 0.6 else 'offense-mid' if t.offensive_index > 0.4 else 'offense-low' }}">{{ t.offensive_index }}</span></td>
+                            <td><span class="index-badges {{ 'defense-high' if t.defensive_index > 1.2 else 'defense-mid' if t.defensive_index > 0.8 else 'defense-low' }}">{{ t.defensive_index }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="section">
+            <h2>可视化分析</h2>
+            <div class="charts-grid">
+                <div class="chart-box full">
+                    <img src="{{ url_for('static', filename='heatmap.png') }}?t={{ range(1000) | random }}" alt="主客场胜率热力图">
+                </div>
+                <div class="chart-box">
+                    <img src="{{ url_for('static', filename='scatter.png') }}?t={{ range(1000) | random }}" alt="攻防指数散点图">
+                </div>
+                <div class="chart-box">
+                    <img src="{{ url_for('static', filename='radar.png') }}?t={{ range(1000) | random }}" alt="球队雷达图">
+                </div>
+            </div>
+        </div>
+
+        <!-- Prediction -->
+        <div class="section">
+            <h2>比赛预测 <span class="accuracy-badge">模型准确率: {{ model_accuracy * 100 }}%</span></h2>
+            <div class="predict-form">
+                <label for="home">Home</label>
+                <select id="home-team">
+                    {% for t in teams %}
+                    <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+                <span style="font-size:1.5em;">⚡</span>
+                <label for="away">Away</label>
+                <select id="away-team">
+                    {% for t in teams %}
+                    <option value="{{ t }}" {% if loop.index == 2 %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="predictMatch()">预测</button>
+            </div>
+            <div class="error-msg" id="error-msg"></div>
+            <div class="predict-result" id="predict-result">
+                <div class="result-card">
+                    <div class="prediction-label" id="pred-label"></div>
+                    <div class="prob-bar-container">
+                        <span>Home Win</span>
+                        <div class="prob-bar"><div class="prob-fill home" id="home-bar"></div></div>
+                        <span class="prob-value" id="home-prob"></span>
+                    </div>
+                    <div class="prob-bar-container">
+                        <span>Draw</span>
+                        <div class="prob-bar"><div class="prob-fill draw" id="draw-bar"></div></div>
+                        <span class="prob-value" id="draw-prob"></span>
+                    </div>
+                    <div class="prob-bar-container">
+                        <span>Away Win</span>
+                        <div class="prob-bar"><div class="prob-fill away" id="away-bar"></div></div>
+                        <span class="prob-value" id="away-prob"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function predictMatch() {
+            var homeTeam = document.getElementById('home-team').value;
+            var awayTeam = document.getElementById('away-team').value;
+            var resultDiv = document.getElementById('predict-result');
+            var errorDiv = document.getElementById('error-msg');
+
+            resultDiv.classList.remove('show');
+            errorDiv.classList.remove('show');
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({home_team: homeTeam, away_team: awayTeam})
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    errorDiv.textContent = data.error;
+                    errorDiv.classList.add('show');
+                    return;
+                }
+                document.getElementById('pred-label').textContent = data.prediction;
+                document.getElementById('home-bar').style.width = (data.home_win_prob * 100) + '%';
+                document.getElementById('home-prob').textContent = (data.home_win_prob * 100).toFixed(1) + '%';
+                document.getElementById('draw-bar').style.width = (data.draw_prob * 100) + '%';
+                document.getElementById('draw-prob').textContent = (data.draw_prob * 100).toFixed(1) + '%';
+                document.getElementById('away-bar').style.width = (data.away_win_prob * 100) + '%';
+                document.getElementById('away-prob').textContent = (data.away_win_prob * 100).toFixed(1) + '%';
+                resultDiv.classList.add('show');
+            })
+            .catch(function(err) {
+                errorDiv.textContent = '请求失败: ' + err.message;
+                errorDiv.classList.add('show');
+            });
+        }
+    </script>
+</body>
+</html>

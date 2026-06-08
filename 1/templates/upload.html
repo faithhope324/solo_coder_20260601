@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出租车行程分析 - 数据上传</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-16">
+        <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-2xl p-8">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                        </svg>
+                    </div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">出租车行程分析</h1>
+                    <p class="text-gray-500">北京出租车出行数据分析平台</p>
+                </div>
+
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-500 transition-colors">
+                    <input type="file" id="fileInput" accept=".csv" class="hidden">
+                    <label for="fileInput" class="cursor-pointer">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <p class="text-lg text-gray-600 mb-2">点击或拖拽上传 CSV 文件</p>
+                        <p class="text-sm text-gray-400">支持出租车行程数据格式</p>
+                    </label>
+                </div>
+
+                <div id="uploadStatus" class="mt-4 hidden">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-blue-500 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="text-blue-700">正在处理数据...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <h3 class="font-semibold text-gray-700 mb-3">CSV 文件格式要求：</h3>
+                    <div class="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+                        <p class="mb-2">必需的列：</p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li><code class="bg-gray-200 px-1 rounded">pickup_datetime</code> - 上车时间</li>
+                            <li><code class="bg-gray-200 px-1 rounded">dropoff_datetime</code> - 下车时间</li>
+                            <li><code class="bg-gray-200 px-1 rounded">pickup_region</code> - 上车区域</li>
+                            <li><code class="bg-gray-200 px-1 rounded">dropoff_region</code> - 下车区域</li>
+                            <li><code class="bg-gray-200 px-1 rounded">fare_amount</code> - 车费（元）</li>
+                        </ul>
+                        <p class="mt-3 text-gray-500">可选列：trip_distance (行程距离，公里)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                uploadStatus.classList.remove('hidden');
+                const formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/';
+                    } else {
+                        alert('上传失败: ' + (data.error || '未知错误'));
+                        uploadStatus.classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    alert('上传失败: ' + error);
+                    uploadStatus.classList.add('hidden');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

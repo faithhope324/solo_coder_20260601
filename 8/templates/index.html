@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>员工离职因素分析报告</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            padding: 40px 0;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: flex;
+            align-items: center;
+        }
+        .card h2::before {
+            content: '';
+            width: 8px;
+            height: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin-right: 15px;
+            border-radius: 4px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-box .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-box .label {
+            color: #666;
+            margin-top: 5px;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .metric-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        .metric-box .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        .metric-box .name {
+            color: #666;
+            font-size: 0.9em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f5f7fa;
+        }
+        .rank-badge {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            text-align: center;
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+        }
+        .rank-1 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .rank-2 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .rank-3 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .rank-other { background: #95a5a6; }
+        .insight-box {
+            background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border-left: 5px solid #fbc02d;
+        }
+        .insight-box h4 {
+            color: #f57f17;
+            margin-bottom: 10px;
+        }
+        .chart-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .chart-container img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .highlight {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .positive {
+            color: #27ae60;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 员工离职因素分析报告</h1>
+            <p>基于随机森林算法的智能分析系统</p>
+        </div>
+
+        <div class="card">
+            <h2>📋 数据概览</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="number">{{ results.summary.total_samples }}</div>
+                    <div class="label">总员工数</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number">{{ results.summary.stayed_count }}</div>
+                    <div class="label">未离职员工</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number">{{ results.summary.left_count }}</div>
+                    <div class="label">离职员工</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number">{{ "%.1f"|format(results.summary.left_rate * 100) }}%</div>
+                    <div class="label">整体离职率</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🎯 特征重要性排名</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>特征名称</th>
+                        <th>重要性分数</th>
+                        <th>占比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for idx, row in results.importance_df.iterrows() %}
+                    <tr>
+                        <td><span class="rank-badge {{ 'rank-' + (idx+1)|string if idx < 3 else 'rank-other' }}">{{ idx + 1 }}</span></td>
+                        <td>{{ row.feature_cn }}</td>
+                        <td><strong>{{ "%.4f"|format(row.importance) }}</strong></td>
+                        <td>{{ "%.1f"|format(row.importance * 100) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <div class="chart-container">
+                <img src="{{ url_for('static', filename='feature_importance.png') }}" alt="特征重要性条形图">
+            </div>
+
+            <div class="insight-box">
+                <h4>💡 关键发现</h4>
+                <p>
+                    根据随机森林模型分析，
+                    <span class="highlight">{{ results.top_features.iloc[0].feature_cn }}</span>
+                    是影响员工离职的最重要因素（重要性：{{ "%.1f"|format(results.top_features.iloc[0].importance * 100) }}%），
+                    其次是
+                    <span class="highlight">{{ results.top_features.iloc[1].feature_cn }}</span>
+                    （{{ "%.1f"|format(results.top_features.iloc[1].importance * 100) }}%）和
+                    <span class="highlight">{{ results.top_features.iloc[2].feature_cn }}</span>
+                    （{{ "%.1f"|format(results.top_features.iloc[2].importance * 100) }}%）。
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📈 离职vs未离职人群特征对比</h2>
+            <div class="chart-container">
+                <img src="{{ url_for('static', filename='boxplot_comparison.png') }}" alt="箱线图对比">
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>特征</th>
+                        <th>未离职均值</th>
+                        <th>离职均值</th>
+                        <th>差异</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for feature, stats in results.feature_stats.items() %}
+                    <tr>
+                        <td><strong>{{ feature }}</strong></td>
+                        <td>{{ "%.2f"|format(stats.stayed_mean) }}</td>
+                        <td>{{ "%.2f"|format(stats.left_mean) }}</td>
+                        <td class="{{ 'positive' if stats.diff > 0 else 'highlight' }}">
+                            {{ '+' if stats.diff > 0 else '' }}{{ "%.2f"|format(stats.diff) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="insight-box">
+                <h4>📊 分布分析</h4>
+                <ul style="margin-left: 20px; line-height: 1.8;">
+                    <li><strong>满意度：</strong>离职员工的满意度显著低于未离职员工，说明低满意度是离职前兆</li>
+                    <li><strong>工龄：</strong>离职员工的平均工龄较长，说明老员工流失风险需要关注</li>
+                    <li><strong>项目数：</strong>离职员工承担的项目数量相对较多，工作量可能是因素之一</li>
+                    <li><strong>绩效评分：</strong>离职员工的绩效评分略低，可能存在绩效与离职的关联</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🤖 模型性能评估</h2>
+            <div style="margin-bottom: 15px; padding: 10px; border-radius: 8px; background: {% if results.cache_used %}#e8f5e9{% else %}#fff3e0{% endif %}; text-align: center;">
+                {% if results.cache_used %}
+                    ✅ <strong>使用缓存结果</strong> | 分析时间: {{ results.cache_time[:19] }} | <a href="/refresh" style="color: #1976d2;">🔄 强制刷新分析</a>
+                {% else %}
+                    ⚡ <strong>最新分析结果</strong> | 分析时间: {{ results.cache_time[:19] }} | 结果已缓存
+                {% endif %}
+            </div>
+            <div class="metric-grid">
+                <div class="metric-box">
+                    <div class="value">{{ "%.1f"|format(results.metrics.accuracy * 100) }}%</div>
+                    <div class="name">准确率 (Accuracy)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="value">{{ "%.1f"|format(results.metrics.precision * 100) }}%</div>
+                    <div class="name">精确率 (Precision)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="value">{{ "%.1f"|format(results.metrics.recall * 100) }}%</div>
+                    <div class="name">召回率 (Recall)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="value">{{ "%.1f"|format(results.metrics.f1 * 100) }}%</div>
+                    <div class="name">F1分数</div>
+                </div>
+            </div>
+            <p style="margin-top: 20px; color: #666; text-align: center;">
+                模型：随机森林 (Random Forest) | 测试集占比：20% | 缓存有效期：1小时
+            </p>
+        </div>
+
+        {% if results.executive_summary %}
+        <div class="card">
+            <h2>📊 执行摘要</h2>
+            <div class="insight-box" style="background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%); border-left-color: #e91e63;">
+                <h4 style="color: #880e4f;">🎯 关键决策信息</h4>
+                <div class="stats-grid" style="margin-top: 15px;">
+                    <div class="stat-box">
+                        <div class="number" style="font-size: 1.8em;">{{ results.executive_summary.total_high_risk_employees }}</div>
+                        <div class="label">🔴 高危员工数</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" style="font-size: 1.8em;">{{ results.executive_summary.total_at_risk_employees }}</div>
+                        <div class="label">🟡 中高风险员工</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" style="font-size: 1.8em; color: #2e7d32;">¥{{ "{:,.0f}".format(results.executive_summary.recommended_investment) }}</div>
+                        <div class="label">建议投入预算</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" style="font-size: 1.8em; color: #e91e63;">{{ "%.0f"|format(results.executive_summary.overall_roi) }}%</div>
+                        <div class="label">预期投资回报率</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px;">
+                    <p><strong>核心发现：</strong>{{ results.executive_summary.top_feature }} 是影响离职的最关键因素（重要性 {{ "%.1f"|format(results.executive_summary.top_feature_importance * 100) }}%）</p>
+                    <p><strong>预期效果：</strong>投入 ¥{{ "{:,.0f}".format(results.executive_summary.recommended_investment) }}，预计挽留 <strong>{{ "%.0f"|format(results.executive_summary.expected_retained_employees) }}</strong> 名员工，节省招聘培训成本 ¥{{ "{:,.0f}".format(results.executive_summary.expected_savings) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>👥 员工分群分析</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>风险等级</th>
+                        <th>员工群体</th>
+                        <th>人数</th>
+                        <th>离职率</th>
+                        <th>平均满意度</th>
+                        <th>平均工龄</th>
+                        <th>平均项目数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for _, row in results.segment_stats.iterrows() %}
+                    <tr>
+                        <td>{{ row.risk_level }}</td>
+                        <td><strong>{{ row.segment_name }}</strong></td>
+                        <td>{{ row.employee_count }}</td>
+                        <td class="{% if row.left_rate > 0.3 %}highlight{% elif row.left_rate > 0.15 %}positive{% endif %}">
+                            {{ "%.1f"|format(row.left_rate * 100) }}%
+                        </td>
+                        <td>{{ "%.2f"|format(row.avg_satisfaction) }}</td>
+                        <td>{{ "%.1f"|format(row.avg_tenure) }}年</td>
+                        <td>{{ "%.1f"|format(row.avg_project_count) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>🚨 高风险群体详情</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>群体名称</th>
+                        <th>群体描述</th>
+                        <th>群体人数</th>
+                        <th>组内离职率</th>
+                        <th>占所有离职</th>
+                        <th>平均满意度</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in results.high_risk_groups %}
+                    <tr>
+                        <td><strong>{{ group.group_name }}</strong></td>
+                        <td>{{ group.description }}</td>
+                        <td>{{ group.employee_count }}</td>
+                        <td class="highlight">{{ "%.1f"|format(group.left_rate_in_group * 100) }}%</td>
+                        <td>{{ "%.1f"|format(group.percent_of_all_left) }}%</td>
+                        <td>{{ "%.2f"|format(group.avg_satisfaction) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>💼 干预方案推荐</h2>
+            <p style="color: #666; margin-bottom: 15px;">按投资回报率(ROI)排序的推荐干预方案</p>
+            
+            {% for idx, plan in results.intervention_plans.head(5).iterrows() %}
+            <div class="insight-box" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left-color: #2196f3; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div>
+                        <h4 style="color: #0d47a1; margin-bottom: 5px;">
+                            {{ idx + 1 }}. {{ plan.intervention_name }} {{ plan.priority }}
+                        </h4>
+                        <p style="color: #555; margin-bottom: 8px;">{{ plan.intervention_description }}</p>
+                    </div>
+                    <div style="text-align: right; background: rgba(255,255,255,0.7); padding: 8px 15px; border-radius: 8px;">
+                        <div style="font-size: 1.5em; font-weight: bold; color: #2e7d32;">
+                            {{ "%.0f"|format(plan.roi_percent) }}%
+                        </div>
+                        <div style="font-size: 0.85em; color: #666;">预期ROI</div>
+                    </div>
+                </div>
+                
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                    <div style="background: rgba(255,255,255,0.6); padding: 10px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #333;">{{ plan.target_employee_count }}</div>
+                        <div style="font-size: 0.8em; color: #666;">覆盖人数</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.6); padding: 10px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #e91e63;">¥{{ "{:,.0f}".format(plan.total_cost) }}</div>
+                        <div style="font-size: 0.8em; color: #666;">总投入</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.6); padding: 10px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #2e7d32;">{{ "%.0f"|format(plan.expected_retained_employees) }}</div>
+                        <div style="font-size: 0.8em; color: #666;">预计挽留</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.6); padding: 10px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #f57c00;">{{ plan.duration_weeks }}周</div>
+                        <div style="font-size: 0.8em; color: #666;">实施周期</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <p style="color: #0d47a1; font-weight: bold; margin-bottom: 5px;">📋 目标群体：</p>
+                    <p style="color: #333; margin-bottom: 8px;">{{ plan.risk_level }} - {{ plan.target_segment }}（当前离职率 {{ "%.1f"|format(plan.baseline_left_rate * 100) }}%）</p>
+                    
+                    <p style="color: #0d47a1; font-weight: bold; margin-bottom: 5px;">🔧 具体行动措施：</p>
+                    <ul style="margin-left: 20px; color: #333; line-height: 1.8;">
+                        {% for action in plan.actions %}
+                        <li>{{ action }}</li>
+                        {% endfor %}
+                    </ul>
+                    
+                    <div style="margin-top: 10px; padding: 8px; background: rgba(255,255,255,0.5); border-radius: 6px; font-size: 0.9em;">
+                        <p><strong>💰 成本效益分析：</strong>
+                           投入 ¥{{ "{:,.0f}".format(plan.total_cost) }}，
+                           预计挽留 <strong>{{ "%.0f"|format(plan.expected_retained_employees) }}</strong> 名员工，
+                           节省招聘培训成本 <strong>¥{{ "{:,.0f}".format(plan.expected_savings) }}</strong>，
+                           净收益 <strong>¥{{ "{:,.0f}".format(plan.net_benefit) }}</strong>，
+                           挽留单名员工成本 <strong>¥{{ "{:,.0f}".format(plan.cost_per_retention) }}</strong>
+                        </p>
+                    </div>
+                    
+                    <div style="margin-top: 8px;">
+                        <span style="display: inline-block; padding: 3px 10px; background: #e8f5e9; color: #2e7d32; border-radius: 12px; font-size: 0.85em; margin-right: 8px;">
+                            ⚡ 实施难度：{{ plan.effort_level }}
+                        </span>
+                        <span style="display: inline-block; padding: 3px 10px; background: #fff3e0; color: #ef6c00; border-radius: 12px; font-size: 0.85em; margin-right: 8px;">
+                            📈 满意度提升：+{{ "%.0f"|format(plan.expected_satisfaction_lift * 100) }}%
+                        </span>
+                        <span style="display: inline-block; padding: 3px 10px; background: #e3f2fd; color: #1565c0; border-radius: 12px; font-size: 0.85em;">
+                            🎯 留存率提升：{{ "%.0f"|format(plan.expected_retention_rate * 100) }}% 目标人群
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <h2>📋 行动计划优先级</h2>
+            <div class="insight-box" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left-color: #4caf50;">
+                <h4 style="color: #2e7d32;">🎯 按ROI排序的Top 3优先行动</h4>
+                <ol style="margin-left: 25px; line-height: 2;">
+                    {% for action in results.executive_summary.priority_actions %}
+                    <li>
+                        <strong>{{ action.action }}</strong>
+                        <span style="color: #666; font-size: 0.9em;">
+                            → 目标：{{ action.target }} | 
+                            投入：¥{{ "{:,.0f}".format(action.cost) }} | 
+                            预期ROI：<span class="positive">{{ "%.0f"|format(action.roi) }}%</span>
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ol>
+                
+                <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.6); border-radius: 8px;">
+                    <h5 style="color: #2e7d32; margin-bottom: 8px;">💡 实施建议：</h5>
+                    <ul style="margin-left: 20px; line-height: 1.8; color: #333;">
+                        <li><strong>短期(1-2周)：</strong>立即启动"1对1深度沟通"，优先覆盖高危群体中的低满意度老员工</li>
+                        <li><strong>中期(1-3个月)：</strong>推行弹性工作制和工作量优化，解决系统性问题</li>
+                        <li><strong>长期(3-12个月)：</strong>建立培训发展体系和导师制度，从根源降低离职风险</li>
+                        <li><strong>预算分配：</strong>建议将70%预算投入Top 2干预措施，可覆盖80%以上高风险员工</li>
+                        <li><strong>效果跟踪：</strong>每季度重新运行分析，评估干预效果并动态调整策略</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
