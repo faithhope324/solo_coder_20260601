@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}区域统计 - 网约车订单区域分析{% endblock %}
+{% block content %}
+<h1 class="page-title">📊 区域统计分析</h1>
+<div class="content-card">
+    <h2>各区域平均车费与平均距离对比</h2>
+    <div id="region-chart"></div>
+</div>
+<div class="content-card" style="margin-top:24px;">
+    <h2>区域统计明细</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>区域</th>
+                <th>订单数</th>
+                <th>平均车费（元）</th>
+                <th>平均距离（公里）</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in stats %}
+            <tr>
+                <td><strong>{{ row['区域'] }}</strong></td>
+                <td>{{ row['订单数'] }}</td>
+                <td>¥{{ row['平均车费'] }}</td>
+                <td>{{ row['平均距离'] }} km</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<script>
+    var chartData = {{ chart_json | safe }};
+    Plotly.newPlot('region-chart', chartData.data, chartData.layout, {responsive: true});
+</script>
+{% endblock %}

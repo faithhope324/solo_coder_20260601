@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}热力地图 - 网约车订单区域分析{% endblock %}
+{% block content %}
+<h1 class="page-title">🔥 订单热力地图</h1>
+<div class="content-card">
+    <h2>上车点分布热力图</h2>
+    <p style="color:#7f8c8d; font-size:13px; margin-bottom:12px;">红色区域表示订单密集区，颜色越深代表订单越集中。</p>
+    <iframe src="{{ url_for('serve_heatmap') }}"></iframe>
+</div>
+{% endblock %}
