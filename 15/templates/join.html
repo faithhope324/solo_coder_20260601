@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>参与投票 - 实时投票系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 28px 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 26px;
+            color: #222;
+            margin-bottom: 14px;
+        }
+        .room-info {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .room-code {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 18px;
+            letter-spacing: 4px;
+        }
+        .status {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .status.active {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.ended {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .participants {
+            background: #f5f5f5;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+        .participants strong {
+            color: #1976d2;
+            font-size: 18px;
+            margin-left: 6px;
+        }
+        .total-votes {
+            font-size: 14px;
+            color: #666;
+        }
+        .total-votes strong {
+            color: #f57c00;
+            font-size: 18px;
+        }
+        .vote-section {
+            background: white;
+            border-radius: 20px;
+            padding: 28px 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        .vote-section h2 {
+            font-size: 18px;
+            color: #444;
+            margin-bottom: 18px;
+        }
+        .voted-banner {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: #0d4f25;
+            padding: 14px 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 18px;
+            display: none;
+        }
+        .ended-banner {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            color: #8b0000;
+            padding: 14px 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 18px;
+            display: none;
+        }
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+        }
+        .option-btn {
+            background: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 18px 20px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+        .option-btn:hover:not(:disabled) {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.15);
+        }
+        .option-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .option-btn.voted {
+            border-color: #4caf50;
+            background: #e8f5e9;
+            color: #1b5e20;
+        }
+        .option-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        .chart-card h2 {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 14px;
+        }
+        .chart-container {
+            position: relative;
+            height: 280px;
+        }
+        .results-list {
+            background: white;
+            border-radius: 20px;
+            padding: 24px 32px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        .results-list h2 {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 16px;
+        }
+        .result-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .result-item:last-child { border-bottom: none; }
+        .result-name {
+            flex: 1;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .result-bar {
+            flex: 2;
+            background: #f0f0f0;
+            border-radius: 10px;
+            height: 10px;
+            margin: 0 16px;
+            overflow: hidden;
+        }
+        .result-bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        .result-stats {
+            width: 110px;
+            text-align: right;
+            font-size: 14px;
+            color: #666;
+        }
+        .result-stats strong {
+            color: #222;
+            font-size: 16px;
+        }
+        .toast {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            padding: 14px 24px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: linear-gradient(135deg, #43e97b, #38f9d7); color: #0d4f25; }
+        .toast.error { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+        @media (max-width: 768px) {
+            .charts { grid-template-columns: 1fr; }
+            .container { padding: 10px; }
+            .header, .vote-section, .chart-card, .results-list { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="vote-title">🗳️ 加载中...</h1>
+            <div class="room-info">
+                <span class="room-code" id="room-code-display">{{ room_code }}</span>
+                <span id="vote-status" class="status active">● 投票进行中</span>
+                <span class="participants">👥 在线人数<strong id="participant-count">0</strong></span>
+                <span class="total-votes">总票数：<strong id="total-votes">0</strong></span>
+            </div>
+        </div>
+
+        <div class="vote-section">
+            <h2>请选择您的选项：</h2>
+            <div id="voted-banner" class="voted-banner">✅ 您已成功投票，感谢参与！</div>
+            <div id="ended-banner" class="ended-banner">⏹ 投票已结束，查看最终结果</div>
+            <div class="options-grid" id="options-grid"></div>
+        </div>
+
+        <div class="charts">
+            <div class="chart-card">
+                <h2>📊 得票比例（饼图）</h2>
+                <div class="chart-container">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h2>📈 得票数量（条形图）</h2>
+                <div class="chart-container">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-list">
+            <h2>📋 实时结果</h2>
+            <div id="results-list"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const ROOM_CODE = '{{ room_code }}';
+        const COLORS = [
+            '#667eea', '#764ba2', '#f093fb', '#f5576c',
+            '#4facfe', '#00f2fe', '#43e97b', '#38f9d7',
+            '#fa709a', '#fee140'
+        ];
+
+        const socket = io();
+        let pieChart = null;
+        let barChart = null;
+        let hasVoted = false;
+        let voteEnded = false;
+        let selectedOption = -1;
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function initCharts() {
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            const barCtx = document.getElementById('barChart').getContext('2d');
+
+            pieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: COLORS, borderWidth: 0 }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#666', padding: 12, font: { size: 12 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                                    return `${ctx.label}: ${ctx.raw} 票 (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: '得票数', data: [], backgroundColor: COLORS, borderRadius: 8 }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                                    return `${ctx.raw} 票 (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { color: '#999', stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                        y: { ticks: { color: '#555' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderOptions(data) {
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = data.options.map((opt, i) => {
+                const isVoted = hasVoted && selectedOption === i;
+                const disabled = hasVoted || voteEnded;
+                return `
+                    <button class="option-btn ${isVoted ? 'voted' : ''}"
+                            data-index="${i}"
+                            ${disabled ? 'disabled' : ''}
+                            onclick="castVote(${i})">
+                        <span class="option-dot" style="background: ${COLORS[i % COLORS.length]}"></span>
+                        <span>${opt}${isVoted ? ' ✓' : ''}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function renderResultsList(data) {
+            const list = document.getElementById('results-list');
+            list.innerHTML = data.options.map((opt, i) => `
+                <div class="result-item">
+                    <div class="result-name">
+                        <span class="option-dot" style="background: ${COLORS[i % COLORS.length]}"></span>
+                        ${opt}
+                    </div>
+                    <div class="result-bar">
+                        <div class="result-bar-fill"
+                             style="width: ${data.percentages[i]}%; background: ${COLORS[i % COLORS.length]}"></div>
+                    </div>
+                    <div class="result-stats">
+                        <strong>${data.counts[i]}</strong> 票 · ${data.percentages[i]}%
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateUI(data) {
+            document.getElementById('vote-title').textContent = '🗳️ ' + data.title;
+            document.getElementById('total-votes').textContent = data.total;
+
+            if (data.is_ended && !voteEnded) {
+                voteEnded = true;
+                const statusEl = document.getElementById('vote-status');
+                statusEl.textContent = '● 投票已结束';
+                statusEl.className = 'status ended';
+                document.getElementById('ended-banner').style.display = 'block';
+            }
+
+            pieChart.data.labels = data.options;
+            pieChart.data.datasets[0].data = data.counts;
+            pieChart.update();
+
+            barChart.data.labels = data.options;
+            barChart.data.datasets[0].data = data.counts;
+            barChart.update();
+
+            renderOptions(data);
+            renderResultsList(data);
+        }
+
+        function castVote(index) {
+            if (hasVoted || voteEnded) return;
+            socket.emit('cast_vote', { room_code: ROOM_CODE, option_index: index });
+        }
+
+        socket.on('connect', function() {
+            socket.emit('join_room', { room_code: ROOM_CODE });
+        });
+
+        socket.on('vote_results', function(data) {
+            if (!pieChart) initCharts();
+            if (data.already_voted && !hasVoted) {
+                hasVoted = true;
+                document.getElementById('voted-banner').style.display = 'block';
+            }
+            updateUI(data);
+        });
+
+        socket.on('vote_success', function(data) {
+            hasVoted = true;
+            selectedOption = data.option_index;
+            document.getElementById('voted-banner').style.display = 'block';
+            showToast('投票成功！', 'success');
+        });
+
+        socket.on('vote_error', function(data) {
+            showToast(data.message, 'error');
+            if (data.message === '您已经投过票了') {
+                hasVoted = true;
+                document.getElementById('voted-banner').style.display = 'block';
+            }
+        });
+
+        socket.on('vote_ended', function(data) {
+            voteEnded = true;
+            document.getElementById('ended-banner').style.display = 'block';
+            updateUI(data);
+        });
+
+        socket.on('participant_count', function(data) {
+            document.getElementById('participant-count').textContent = data.count;
+        });
+
+        socket.on('error', function(data) {
+            showToast(data.message, 'error');
+        });
+
+        initCharts();
+    </script>
+</body>
+</html>

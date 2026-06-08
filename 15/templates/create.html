@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创建投票 - 实时投票系统</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .hint {
+            color: #999;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error {
+            background: #fff0f0;
+            border: 1px solid #ffcdd2;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .result {
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .result h2 {
+            color: #2e7d32;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+        .room-code {
+            font-size: 40px;
+            font-weight: bold;
+            color: #1b5e20;
+            letter-spacing: 8px;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .copy-btn {
+            background: #4caf50;
+            padding: 10px 20px;
+            font-size: 14px;
+            width: auto;
+            display: inline-block;
+        }
+        .host-link {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #c8e6c9;
+        }
+        .host-link a {
+            color: #2e7d32;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .host-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 创建投票</h1>
+        <p class="subtitle">创建一个实时多人投票，生成房间码分享给参与者</p>
+
+        <div id="error-box" class="error" style="display: none;"></div>
+
+        <form id="create-form">
+            <div class="form-group">
+                <label for="title">投票标题</label>
+                <input type="text" id="title" name="title" placeholder="例如：最佳编程语言" maxlength="100" required>
+            </div>
+            <div class="form-group">
+                <label for="options">投票选项</label>
+                <textarea id="options" name="options" placeholder="用逗号分隔，例如：Python,Java,JavaScript,Go" required></textarea>
+                <p class="hint">至少2个选项，最多10个选项</p>
+            </div>
+            <button type="submit" id="submit-btn">生成房间码</button>
+        </form>
+
+        <div id="result-box" class="result" style="display: none;">
+            <h2>✅ 投票创建成功！</h2>
+            <p style="color: #555; margin-bottom: 8px;">分享房间码给参与者：</p>
+            <div class="room-code" id="room-code-display"></div>
+            <button class="copy-btn" onclick="copyRoomCode()">📋 复制房间码</button>
+            <div class="host-link">
+                <p style="color: #555; font-size: 14px; margin-bottom: 8px;">作为主持人进入：</p>
+                <a id="host-link" href="#">进入主持人页面 →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('create-form');
+        const errorBox = document.getElementById('error-box');
+        const resultBox = document.getElementById('result-box');
+        const submitBtn = document.getElementById('submit-btn');
+        const roomCodeDisplay = document.getElementById('room-code-display');
+        const hostLink = document.getElementById('host-link');
+
+        function showError(msg) {
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+            resultBox.style.display = 'none';
+        }
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            errorBox.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.textContent = '创建中...';
+
+            const title = document.getElementById('title').value.trim();
+            const options = document.getElementById('options').value.trim();
+
+            try {
+                const res = await fetch('/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, options })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    const code = data.room_code;
+                    roomCodeDisplay.textContent = code;
+                    hostLink.href = '/host/' + code;
+                    resultBox.style.display = 'block';
+                    form.style.display = 'none';
+                } else {
+                    showError(data.error || '创建失败');
+                }
+            } catch (err) {
+                showError('网络错误，请重试');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '生成房间码';
+            }
+        });
+
+        function copyRoomCode() {
+            const code = roomCodeDisplay.textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const original = btn.textContent;
+                btn.textContent = '✅ 已复制！';
+                setTimeout(() => btn.textContent = original, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
