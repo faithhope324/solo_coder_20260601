@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐厅订单时段分析仪表板</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 25px 35px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .header .subtitle {
+            color: #718096;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .reset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .current-filter {
+            background: #f0f4ff;
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-card .label {
+            color: #718096;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            color: #2d3748;
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .stat-card .unit {
+            color: #a0aec0;
+            font-size: 14px;
+            margin-left: 5px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            background: white;
+            color: #718096;
+            border: 2px solid transparent;
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .tab-btn:hover:not(.active) {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-card.full-width {
+            grid-column: span 2;
+        }
+
+        .chart-container {
+            width: 100%;
+        }
+
+        .hint {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #92400e;
+            font-size: 13px;
+        }
+
+        @media (max-width: 1200px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+            .chart-card.full-width {
+                grid-column: span 1;
+            }
+            .stats-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🍽️ 餐厅订单时段分析仪表板</h1>
+                <div class="subtitle">过去 30 天数据 · 点击图表可联动筛选</div>
+            </div>
+            <div class="filter-bar">
+                <div class="current-filter" id="currentFilter">当前筛选：全部时段</div>
+                <button class="reset-btn" onclick="resetFilter()">重置筛选</button>
+            </div>
+        </div>
+
+        <div class="hint">
+            💡 <strong>交互提示：</strong>点击时段分析柱状图中的某个时段，其他图表将自动联动刷新，展示该时段的数据。
+        </div>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="label">总订单数</div>
+                <div class="value" id="stat-orders">{{ stats["总订单数"] }}<span class="unit">单</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="label">总营业额</div>
+                <div class="value" id="stat-revenue">¥{{ stats["总营业额"] }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">平均客单价</div>
+                <div class="value" id="stat-avg">¥{{ stats["平均客单价"] }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">总菜品销量</div>
+                <div class="value" id="stat-items">{{ stats["总菜品数"] }}<span class="unit">份</span></div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('time')">时段分析</button>
+            <button class="tab-btn" onclick="switchTab('dishes')">热门菜品</button>
+            <button class="tab-btn" onclick="switchTab('tables')">桌号分析</button>
+            <button class="tab-btn" onclick="switchTab('trend')">趋势分析</button>
+        </div>
+
+        <div id="tab-time" class="tab-content active">
+            <div class="chart-grid">
+                <div class="chart-card full-width">
+                    <div id="time-slot-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-dishes" class="tab-content">
+            <div class="chart-grid">
+                <div class="chart-card full-width">
+                    <div id="top-dishes-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-tables" class="tab-content">
+            <div class="chart-grid">
+                <div class="chart-card full-width">
+                    <div id="heatmap-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-trend" class="tab-content">
+            <div class="chart-grid">
+                <div class="chart-card full-width">
+                    <div id="trend-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSlot = null;
+        const slotNameMap = {{ slot_name_map | tojson }};
+
+        function renderCharts(data) {
+            const timeSlotData = JSON.parse(data.time_slot);
+            const topDishesData = JSON.parse(data.top_dishes);
+            const heatmapData = JSON.parse(data.heatmap);
+            const trendData = JSON.parse(data.trend);
+
+            Plotly.newPlot("time-slot-chart", timeSlotData.data, timeSlotData.layout, {responsive: true});
+            Plotly.newPlot("top-dishes-chart", topDishesData.data, topDishesData.layout, {responsive: true});
+            Plotly.newPlot("heatmap-chart", heatmapData.data, heatmapData.layout, {responsive: true});
+            Plotly.newPlot("trend-chart", trendData.data, trendData.layout, {responsive: true});
+
+            const timeChart = document.getElementById("time-slot-chart");
+            timeChart.on("plotly_click", function(data) {
+                if (data.points && data.points.length > 0) {
+                    const point = data.points[0];
+                    const slotKey = point.customdata;
+                    if (slotKey && slotKey !== currentSlot) {
+                        filterBySlot(slotKey);
+                    }
+                }
+            });
+        }
+
+        function filterBySlot(slotKey) {
+            currentSlot = slotKey;
+            updateFilterDisplay();
+            fetch("/api/filter?slot=" + encodeURIComponent(slotKey))
+                .then(response => response.json())
+                .then(data => {
+                    updateStats(data.stats);
+                    renderCharts(data.charts);
+                });
+        }
+
+        function resetFilter() {
+            currentSlot = null;
+            updateFilterDisplay();
+            fetch("/api/filter")
+                .then(response => response.json())
+                .then(data => {
+                    updateStats(data.stats);
+                    renderCharts(data.charts);
+                });
+        }
+
+        function updateStats(stats) {
+            document.getElementById("stat-orders").innerHTML = stats["总订单数"] + '<span class="unit">单</span>';
+            document.getElementById("stat-revenue").innerHTML = "¥" + stats["总营业额"];
+            document.getElementById("stat-avg").innerHTML = "¥" + stats["平均客单价"];
+            document.getElementById("stat-items").innerHTML = stats["总菜品数"] + '<span class="unit">份</span>';
+        }
+
+        function updateFilterDisplay() {
+            const filterEl = document.getElementById("currentFilter");
+            if (currentSlot) {
+                filterEl.textContent = "当前筛选：" + slotNameMap[currentSlot];
+            } else {
+                filterEl.textContent = "当前筛选：全部时段";
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+            document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
+            event.target.classList.add("active");
+            document.getElementById("tab-" + tabName).classList.add("active");
+        }
+
+        renderCharts({{ initial_charts | tojson }});
+    </script>
+</body>
+</html>
