@@ -285,6 +285,8 @@ class MainWindow(QMainWindow):
             )
             if device:
                 self.update_table_row(self.editing_device_id, device)
+                if self.ping_detector:
+                    self.ping_detector.invalidate_cache()
                 QMessageBox.information(self, '成功', '设备更新成功')
                 self.status_bar.showMessage(f'设备 {name} 已更新')
             self.clear_form()
@@ -292,6 +294,8 @@ class MainWindow(QMainWindow):
             device = self.device_manager.add_device(name, mac, ip)
             if device:
                 self.add_device_to_table(device)
+                if self.ping_detector:
+                    self.ping_detector.invalidate_cache()
                 QMessageBox.information(self, '成功', '设备添加成功')
                 self.status_bar.showMessage(f'设备 {name} 已添加')
                 self.clear_form()
@@ -324,6 +328,10 @@ class MainWindow(QMainWindow):
                 self.device_manager.delete_schedule(s['id'])
 
             self.device_manager.delete_device(self.editing_device_id)
+            if self.ping_detector:
+                self.ping_detector.invalidate_cache()
+            if self.scheduler:
+                self.scheduler.invalidate_cache()
             self.load_devices_to_table()
             self.load_schedules_to_list()
             self.clear_form()
@@ -383,6 +391,8 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             for device in new_devices:
                 self.device_manager.add_device(device['name'], device['mac'], device['ip'])
+            if self.ping_detector:
+                self.ping_detector.invalidate_cache()
             self.load_devices_to_table()
             self.status_bar.showMessage(f'已添加 {len(new_devices)} 个新设备')
 
@@ -461,9 +471,9 @@ class MainWindow(QMainWindow):
             self.editing_device_id, wake_time, repeat
         )
         if schedule:
-            self.load_schedules_to_list()
             if self.scheduler:
-                self.scheduler.refresh_schedules()
+                self.scheduler.invalidate_cache()
+            self.load_schedules_to_list()
             QMessageBox.information(self, '成功', '定时任务添加成功')
             self.status_bar.showMessage(f'定时任务已添加: {wake_time}')
 
@@ -509,7 +519,7 @@ class MainWindow(QMainWindow):
         enabled = state == Qt.Checked
         self.device_manager.update_schedule(schedule_id, enabled=enabled)
         if self.scheduler:
-            self.scheduler.refresh_schedules()
+            self.scheduler.invalidate_cache()
 
     def delete_selected_schedule(self):
         current_row = self.schedule_table.currentRow()
@@ -531,7 +541,7 @@ class MainWindow(QMainWindow):
             if reply == QMessageBox.Yes:
                 self.device_manager.delete_schedule(schedule_id)
                 if self.scheduler:
-                    self.scheduler.refresh_schedules()
+                    self.scheduler.invalidate_cache()
                 if self.editing_device_id:
                     self.load_schedules_for_device(self.editing_device_id)
                 else:
