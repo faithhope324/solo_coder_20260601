@@ -24,9 +24,23 @@ def get_time_slot(hour: int) -> Optional[str]:
     return None
 
 
+def get_time_slot_exact(dt) -> Optional[str]:
+    hour = dt.hour
+    minute = dt.minute
+    second = dt.second
+    total_seconds = hour * 3600 + minute * 60 + second
+    adjusted_seconds = total_seconds if total_seconds >= 2 * 3600 else total_seconds + 24 * 3600
+    for slot in TIME_SLOTS:
+        start_seconds = slot["start"] * 3600
+        end_seconds = slot["end"] * 3600
+        if start_seconds <= adjusted_seconds < end_seconds:
+            return slot["key"]
+    return None
+
+
 def assign_time_slots(df, hour_col="小时", slot_col="时段"):
     df = df.copy()
-    df[slot_col] = df[hour_col].apply(get_time_slot)
+    df[slot_col] = df["订单时间"].apply(get_time_slot_exact)
     df[slot_col] = pd.Categorical(df[slot_col], categories=SLOT_ORDER, ordered=True)
     return df
 

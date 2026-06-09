@@ -58,9 +58,14 @@ def get_time_range(slot):
 
 def generate_random_time(base_date, slot):
     start_h, end_h = get_time_range(slot)
-    hour = random.randint(start_h, end_h - 1)
-    minute = random.randint(0, 59)
-    second = random.randint(0, 59)
+    if random.random() < 0.1:
+        hour = end_h - 1
+        minute = random.randint(55, 59)
+        second = random.randint(0, 59)
+    else:
+        hour = random.randint(start_h, end_h - 1)
+        minute = random.randint(0, 59)
+        second = random.randint(0, 59)
     days_to_add = hour // 24
     actual_hour = hour % 24
     return base_date + timedelta(
@@ -77,6 +82,17 @@ def weighted_random_choice(items, weights):
         if r <= cumulative:
             return item
     return items[-1]
+
+
+def generate_supper_last_minute(current_date):
+    hour = 25
+    minute = random.randint(59, 59)
+    second = random.randint(0, 59)
+    days_to_add = hour // 24
+    actual_hour = hour % 24
+    return current_date + timedelta(
+        days=days_to_add, hours=actual_hour, minutes=minute, seconds=second
+    )
 
 
 def main():
@@ -96,11 +112,15 @@ def main():
 
         daily_orders = int(random.randint(80, 120) * weekend_multiplier)
 
-        for _ in range(daily_orders):
-            slot = weighted_random_choice(
-                list(time_slot_weights.keys()), list(time_slot_weights.values())
-            )
-            order_time = generate_random_time(current_date, slot)
+        for idx in range(daily_orders):
+            if idx == daily_orders - 1:
+                slot = "supper"
+                order_time = generate_supper_last_minute(current_date)
+            else:
+                slot = weighted_random_choice(
+                    list(time_slot_weights.keys()), list(time_slot_weights.values())
+                )
+                order_time = generate_random_time(current_date, slot)
 
             table = random.randint(1, 20)
 
