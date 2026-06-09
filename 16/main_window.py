@@ -462,6 +462,8 @@ class MainWindow(QMainWindow):
         )
         if schedule:
             self.load_schedules_to_list()
+            if self.scheduler:
+                self.scheduler.refresh_schedules()
             QMessageBox.information(self, '成功', '定时任务添加成功')
             self.status_bar.showMessage(f'定时任务已添加: {wake_time}')
 
@@ -506,6 +508,8 @@ class MainWindow(QMainWindow):
     def toggle_schedule(self, schedule_id, state):
         enabled = state == Qt.Checked
         self.device_manager.update_schedule(schedule_id, enabled=enabled)
+        if self.scheduler:
+            self.scheduler.refresh_schedules()
 
     def delete_selected_schedule(self):
         current_row = self.schedule_table.currentRow()
@@ -526,6 +530,8 @@ class MainWindow(QMainWindow):
             )
             if reply == QMessageBox.Yes:
                 self.device_manager.delete_schedule(schedule_id)
+                if self.scheduler:
+                    self.scheduler.refresh_schedules()
                 if self.editing_device_id:
                     self.load_schedules_for_device(self.editing_device_id)
                 else:
