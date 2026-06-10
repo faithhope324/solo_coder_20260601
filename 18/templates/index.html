@@ -1,0 +1,520 @@
+{% extends 'base.html' %}
+
+{% block title %}幸运大转盘 - 抽奖系统{% endblock %}
+
+{% block content %}
+<div class="lottery-container">
+    <div class="lottery-header">
+        <div class="chances-display">
+            <span class="chances-label">今日剩余抽奖次数：</span>
+            <span class="chances-value" id="remainingChances">{{ remaining_chances }}</span>
+            <span class="chances-total"> / {{ daily_free_chances }}</span>
+        </div>
+        <div class="points-display">
+            <span class="points-icon">💎</span>
+            <span class="points-value" id="totalPoints">{{ user.total_points|default:0 }}</span>
+            <span class="points-label">积分</span>
+        </div>
+    </div>
+
+    <div class="lottery-main">
+        <div class="wheel-wrapper">
+            <div class="wheel-container">
+                <canvas id="wheelCanvas" width="500" height="500"></canvas>
+                <div class="wheel-pointer">
+                    <div class="pointer-top"></div>
+                    <div class="pointer-bottom"></div>
+                </div>
+                <button class="start-btn" id="startBtn" {% if remaining_chances <= 0 %}disabled{% endif %}>
+                    <span class="btn-text">开始抽奖</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="prize-list">
+            <h3 class="section-title">奖品列表</h3>
+            <div class="prize-grid" id="prizeGrid">
+                {% for prize in prizes %}
+                <div class="prize-item prize-type-{{ prize.prize_type }}">
+                    <div class="prize-badge">{{ prize.get_prize_type_display }}</div>
+                    <div class="prize-name">{{ prize.name }}</div>
+                    <div class="prize-prob">概率：{{ prize.probability }}%</div>
+                    <div class="prize-stock">库存：<span class="stock-value" id="stock-{{ prize.id }}">{{ prize.current_stock }}</span></div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="records-section">
+        <h3 class="section-title">我的抽奖记录</h3>
+        <div class="records-list" id="recordsList">
+            <div class="loading">加载中...</div>
+        </div>
+        <div class="records-pagination" id="recordsPagination">
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="resultModal" style="display: none;">
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">🎉 抽奖结果 🎉</h3>
+        </div>
+        <div class="modal-body">
+            <div class="result-icon" id="resultIcon">🎁</div>
+            <div class="result-prize-type" id="resultPrizeType">一等奖</div>
+            <div class="result-prize-name" id="resultPrizeName">iPhone 15 Pro</div>
+            <div class="result-message" id="resultMessage">恭喜您获得大奖！</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" id="closeModalBtn">确定</button>
+        </div>
+    </div>
+</div>
+
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lottery-container {
+        padding: 20px 0;
+    }
+    
+    .lottery-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px 30px;
+        border-radius: 16px;
+        color: white;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .chances-display {
+        font-size: 18px;
+    }
+    
+    .chances-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #ffd700;
+        margin: 0 5px;
+    }
+    
+    .chances-total {
+        color: rgba(255,255,255,0.7);
+    }
+    
+    .points-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 18px;
+    }
+    
+    .points-icon {
+        font-size: 24px;
+    }
+    
+    .points-value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #ffd700;
+    }
+    
+    .lottery-main {
+        display: flex;
+        gap: 40px;
+        margin-bottom: 40px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .wheel-wrapper {
+        flex: 0 0 auto;
+    }
+    
+    .wheel-container {
+        position: relative;
+        width: 500px;
+        height: 500px;
+    }
+    
+    #wheelCanvas {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        box-shadow: 0 0 30px rgba(0,0,0,0.2), inset 0 0 20px rgba(0,0,0,0.1);
+    }
+    
+    .wheel-pointer {
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+    }
+    
+    .pointer-top {
+        width: 0;
+        height: 0;
+        border-left: 20px solid transparent;
+        border-right: 20px solid transparent;
+        border-top: 40px solid #e74c3c;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    }
+    
+    .pointer-bottom {
+        width: 20px;
+        height: 15px;
+        background: #c0392b;
+        margin: -2px auto 0;
+        border-radius: 0 0 10px 10px;
+    }
+    
+    .start-btn {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        color: white;
+        border: 4px solid white;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 10;
+        box-shadow: 0 4px 20px rgba(238, 90, 36, 0.5);
+        transition: all 0.3s;
+    }
+    
+    .start-btn:hover:not(:disabled) {
+        transform: translate(-50%, -50%) scale(1.1);
+        box-shadow: 0 6px 30px rgba(238, 90, 36, 0.7);
+    }
+    
+    .start-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+    
+    .start-btn.spinning {
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+    
+    .btn-text {
+        display: inline-block;
+    }
+    
+    .prize-list {
+        flex: 1;
+        min-width: 350px;
+        max-width: 500px;
+    }
+    
+    .section-title {
+        font-size: 24px;
+        color: #333;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 3px solid #667eea;
+        display: inline-block;
+    }
+    
+    .prize-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+    
+    .prize-item {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+    
+    .prize-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+    
+    .prize-type-1 { border-left-color: #e74c3c; }
+    .prize-type-2 { border-left-color: #e67e22; }
+    .prize-type-3 { border-left-color: #f39c12; }
+    .prize-type-4 { border-left-color: #2ecc71; }
+    .prize-type-5 { border-left-color: #3498db; }
+    .prize-type-6 { border-left-color: #9b59b6; }
+    .prize-type-7 { border-left-color: #1abc9c; }
+    .prize-type-8 { border-left-color: #95a5a6; }
+    
+    .prize-badge {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-bottom: 8px;
+    }
+    
+    .prize-type-1 .prize-badge { background: #e74c3c; }
+    .prize-type-2 .prize-badge { background: #e67e22; }
+    .prize-type-3 .prize-badge { background: #f39c12; }
+    .prize-type-4 .prize-badge { background: #2ecc71; }
+    .prize-type-5 .prize-badge { background: #3498db; }
+    .prize-type-6 .prize-badge { background: #9b59b6; }
+    .prize-type-7 .prize-badge { background: #1abc9c; }
+    .prize-type-8 .prize-badge { background: #95a5a6; }
+    
+    .prize-name {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+        font-size: 15px;
+    }
+    
+    .prize-prob {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 3px;
+    }
+    
+    .prize-stock {
+        font-size: 13px;
+        color: #666;
+    }
+    
+    .stock-value {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+    
+    .records-section {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    .records-list {
+        min-height: 200px;
+    }
+    
+    .record-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        transition: background 0.3s;
+    }
+    
+    .record-item:hover {
+        background: #f8f9fa;
+    }
+    
+    .record-info {
+        flex: 1;
+    }
+    
+    .record-prize {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .record-win {
+        color: #e74c3c;
+    }
+    
+    .record-lose {
+        color: #999;
+    }
+    
+    .record-time {
+        font-size: 13px;
+        color: #999;
+    }
+    
+    .record-badge {
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        color: white;
+    }
+    
+    .loading {
+        text-align: center;
+        color: #999;
+        padding: 40px;
+    }
+    
+    .no-records {
+        text-align: center;
+        color: #999;
+        padding: 40px;
+    }
+    
+    .records-pagination {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .page-btn {
+        padding: 8px 16px;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .page-btn:hover:not(:disabled) {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+    
+    .page-btn.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+    
+    .page-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+        position: relative;
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        width: 90%;
+        max-width: 450px;
+        text-align: center;
+        animation: modalIn 0.3s ease-out;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    @keyframes modalIn {
+        from {
+            opacity: 0;
+            transform: scale(0.8) translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+    
+    .modal-title {
+        font-size: 24px;
+        color: #333;
+        margin: 0;
+    }
+    
+    .modal-body {
+        padding: 30px 0;
+    }
+    
+    .result-icon {
+        font-size: 80px;
+        margin-bottom: 20px;
+        animation: bounce 1s ease infinite;
+    }
+    
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .result-prize-type {
+        font-size: 20px;
+        font-weight: bold;
+        color: #e74c3c;
+        margin-bottom: 10px;
+    }
+    
+    .result-prize-name {
+        font-size: 28px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+    }
+    
+    .result-message {
+        font-size: 16px;
+        color: #666;
+    }
+    
+    .modal-footer {
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+    }
+    
+    @media (max-width: 768px) {
+        .lottery-main {
+            flex-direction: column;
+        }
+        
+        .wheel-container {
+            width: 350px;
+            height: 350px;
+        }
+        
+        .prize-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .lottery-header {
+            flex-direction: column;
+            gap: 15px;
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{% load static %}
+<script src="{% static 'js/lottery.js' %}"></script>
+{% endblock %}

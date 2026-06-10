@@ -1,0 +1,64 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block result_list %}
+    {% if today_stats %}
+    <div class="module" style="margin-bottom: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #333;">📊 今日抽奖统计</h3>
+        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+            <div style="background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">总抽奖次数</div>
+                <div style="font-size: 32px; font-weight: bold; color: #667eea;">{{ today_stats.total }}</div>
+            </div>
+            <div style="background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">中奖次数</div>
+                <div style="font-size: 32px; font-weight: bold; color: #2ecc71;">{{ today_stats.win_count }}</div>
+            </div>
+            <div style="background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">中奖率</div>
+                <div style="font-size: 32px; font-weight: bold; color: #f39c12;">
+                    {% if today_stats.total > 0 %}
+                        {{ today_stats.win_count|floatformat:1 }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        {% if today_stats.by_type %}
+        <div style="margin-top: 20px;">
+            <h4 style="color: #555; margin-bottom: 10px;">各奖项分布</h4>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                {% for stat in today_stats.by_type %}
+                    {% with prize_type=stat.prize_type %}
+                    <div style="background: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-width: 100px; text-align: center;">
+                        {% if prize_type == 1 %}
+                            <div style="color: #e74c3c; font-weight: bold;">一等奖</div>
+                        {% elif prize_type == 2 %}
+                            <div style="color: #e67e22; font-weight: bold;">二等奖</div>
+                        {% elif prize_type == 3 %}
+                            <div style="color: #f39c12; font-weight: bold;">三等奖</div>
+                        {% elif prize_type == 4 %}
+                            <div style="color: #2ecc71; font-weight: bold;">四等奖</div>
+                        {% elif prize_type == 5 %}
+                            <div style="color: #3498db; font-weight: bold;">五等奖</div>
+                        {% elif prize_type == 6 %}
+                            <div style="color: #9b59b6; font-weight: bold;">六等奖</div>
+                        {% elif prize_type == 7 %}
+                            <div style="color: #1abc9c; font-weight: bold;">七等奖</div>
+                        {% elif prize_type == 8 %}
+                            <div style="color: #95a5a6; font-weight: bold;">八等奖</div>
+                        {% endif %}
+                        <div style="font-size: 24px; font-weight: bold; color: #333;">{{ stat.count }}</div>
+                    </div>
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {{ block.super }}
+{% endblock %}
