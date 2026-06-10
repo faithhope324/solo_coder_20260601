@@ -1,7 +1,7 @@
 import json
-import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
+from pathlib import Path
 
 from event_store import Macro, MacroEvent, EventType, MouseButton
 
@@ -79,14 +79,15 @@ class JsonSerializer:
             return None
 
     @staticmethod
-    def save_macro(macro: Macro, filepath: str) -> bool:
+    def save_macro(macro: Macro, filepath: Union[str, Path]) -> bool:
         try:
+            path = Path(filepath)
             macro.modified_at = datetime.now().isoformat()
             if not macro.created_at:
                 macro.created_at = macro.modified_at
             data = JsonSerializer.macro_to_dict(macro)
-            os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
-            with open(filepath, "w", encoding="utf-8") as f:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             return True
         except Exception as e:
@@ -94,9 +95,10 @@ class JsonSerializer:
             return False
 
     @staticmethod
-    def load_macro(filepath: str) -> Optional[Macro]:
+    def load_macro(filepath: Union[str, Path]) -> Optional[Macro]:
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            path = Path(filepath)
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return JsonSerializer.dict_to_macro(data)
         except Exception as e:
@@ -104,10 +106,10 @@ class JsonSerializer:
             return None
 
     @staticmethod
-    def get_macros_directory() -> str:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        macros_dir = os.path.join(base_dir, "macros")
-        os.makedirs(macros_dir, exist_ok=True)
+    def get_macros_directory() -> Path:
+        base_dir = Path(__file__).resolve().parent
+        macros_dir = base_dir / "macros"
+        macros_dir.mkdir(parents=True, exist_ok=True)
         return macros_dir
 
     @staticmethod
@@ -115,12 +117,10 @@ class JsonSerializer:
         macros_dir = JsonSerializer.get_macros_directory()
         macros = []
         try:
-            for filename in os.listdir(macros_dir):
-                if filename.endswith(".json"):
-                    filepath = os.path.join(macros_dir, filename)
-                    macro = JsonSerializer.load_macro(filepath)
-                    if macro:
-                        macros.append((filename, macro))
+            for filepath in macros_dir.glob("*.json"):
+                macro = JsonSerializer.load_macro(filepath)
+                if macro:
+                    macros.append((filepath.name, macro))
         except Exception as e:
             print(f"列出宏失败: {e}")
         return macros
