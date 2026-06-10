@@ -27,7 +27,7 @@ class MacroRecorderApp:
         self.loop_count_var = tk.StringVar(value="1")
         self.infinite_loop_var = tk.BooleanVar(value=False)
         self.speed_var = tk.DoubleVar(value=1.0)
-        self.start_minimized_var = tk.BooleanVar(value=True)
+        self.start_minimized_var = tk.BooleanVar(value=False)
 
         self._setup_tray_callbacks()
         self._setup_player_callbacks()
