@@ -1,15 +1,18 @@
 import random
 from decimal import Decimal
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from django.core.cache import cache
+from django.db import transaction
 from .models import Prize
 
 PRIZE_STOCK_KEY_PREFIX = 'prize:stock:'
+PROBABILITY_VALIDATION_KEY = 'probability:validation:status'
 
 
 class LotteryAlgorithm:
     def __init__(self):
         self.max_retry_attempts = 5
+        self.tolerance = Decimal('0.01')
 
     def get_prize_stock(self, prize_id: int) -> int:
         key = f'{PRIZE_STOCK_KEY_PREFIX}{prize_id}'
@@ -31,6 +34,45 @@ class LotteryAlgorithm:
             return False, 0
         return True, stock
 
+    def increase_stock(self, prize_id: int) -> Tuple[bool, int]:
+        key = f'{PRIZE_STOCK_KEY_PREFIX}{prize_id}'
+        new_stock = cache.incr(key, 1)
+        try:
+            Prize.objects.filter(id=prize_id).update(current_stock=new_stock)
+        except Exception:
+            pass
+        return True, int(new_stock)
+
+    def validate_probability_sum(self, prizes: List[Prize] = None) -> Tuple[bool, Decimal, str]:
+        if prizes is None:
+            prizes = Prize.objects.filter(is_active=True).all()
+        
+        total_prob = sum(p.probability for p in prizes)
+        diff = abs(total_prob - Decimal('100'))
+        
+        if diff <= self.tolerance:
+            cache.set(PROBABILITY_VALIDATION_KEY, {'valid': True, 'total': float(total_prob)}, timeout=3600)
+            return True, total_prob, '概率总和校验通过'
+        
+        message = f'概率总和为 {total_prob}%，不等于 100%，差值为 {diff}%'
+        cache.set(PROBABILITY_VALIDATION_KEY, {'valid': False, 'total': float(total_prob)}, timeout=3600)
+        return False, total_prob, message
+
+    def get_probability_validation_status(self) -> Dict:
+        status = cache.get(PROBABILITY_VALIDATION_KEY)
+        if status is None:
+            valid, total, message = self.validate_probability_sum()
+            return {
+                'valid': valid,
+                'total': float(total),
+                'message': message
+            }
+        return {
+            'valid': status.get('valid', False),
+            'total': status.get('total', 0),
+            'message': '概率校验状态已缓存'
+        }
+
     def get_active_prizes(self) -> List[Prize]:
         prizes = cache.get('active_prizes')
         if prizes is None:
@@ -38,7 +80,12 @@ class LotteryAlgorithm:
             cache.set('active_prizes', prizes, timeout=300)
         return prizes
 
-    def calculate_probability_ranges(self, prizes: List[Prize]) -> List[Tuple[Prize, Decimal, Decimal]]:
+    def calculate_probability_ranges(self, prizes: List[Prize]) -> Tuple[List[Tuple[Prize, Decimal, Decimal]], bool]:
+        valid, total_prob, message = self.validate_probability_sum(prizes)
+        
+        if not valid:
+            raise ValueError(message)
+        
         ranges = []
         current = Decimal('0')
         
@@ -48,12 +95,10 @@ class LotteryAlgorithm:
                 ranges.append((prize, current, current + prob))
                 current += prob
         
-        if current != Decimal('100'):
-            if ranges:
-                last_prize, start, end = ranges[-1]
-                ranges[-1] = (last_prize, start, Decimal('100'))
+        if abs(current - Decimal('100')) > self.tolerance:
+            raise ValueError(f'计算区间错误，累计概率: {current}%')
         
-        return ranges
+        return ranges, valid
 
     def select_prize_by_probability(self, ranges: List[Tuple[Prize, Decimal, Decimal]]) -> Optional[Prize]:
         if not ranges:
@@ -75,6 +120,10 @@ class LotteryAlgorithm:
         if not prizes:
             return None, '暂无可用奖品'
         
+        valid, total_prob, msg = self.validate_probability_sum(prizes)
+        if not valid:
+            return None, f'奖品概率配置错误：{msg}'
+        
         available_prizes = [p for p in prizes if self.get_prize_stock(p.id) > 0]
         if not available_prizes:
             return None, '所有奖品已抽完'
@@ -82,7 +131,11 @@ class LotteryAlgorithm:
         tried_prize_ids = set()
         
         for attempt in range(self.max_retry_attempts):
-            ranges = self.calculate_probability_ranges(available_prizes)
+            try:
+                ranges, valid = self.calculate_probability_ranges(available_prizes)
+            except ValueError as e:
+                return None, str(e)
+            
             selected_prize = self.select_prize_by_probability(ranges)
             
             if selected_prize is None:
@@ -101,7 +154,8 @@ class LotteryAlgorithm:
             
             success, new_stock = self.decrease_stock(selected_prize.id)
             if success:
-                Prize.objects.filter(id=selected_prize.id).update(current_stock=new_stock)
+                with transaction.atomic():
+                    Prize.objects.filter(id=selected_prize.id).update(current_stock=new_stock)
                 return selected_prize, 'success'
             else:
                 tried_prize_ids.add(selected_prize.id)
@@ -137,6 +191,7 @@ class LotteryAlgorithm:
 
     def clear_cache(self):
         cache.delete('active_prizes')
+        cache.delete(PROBABILITY_VALIDATION_KEY)
         keys = cache.keys(f'{PRIZE_STOCK_KEY_PREFIX}*')
         if keys:
             cache.delete_many(keys)

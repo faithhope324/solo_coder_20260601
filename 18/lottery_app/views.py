@@ -103,14 +103,6 @@ def draw_api(request):
             'code': 'NO_CHANCES'
         }, status=400)
     
-    success, remaining_after = redis_service.consume_chance(user.id)
-    if not success:
-        return JsonResponse({
-            'success': False,
-            'message': '消耗抽奖次数失败，请重试',
-            'code': 'CONSUME_FAILED'
-        }, status=500)
-    
     prize, message = lottery_algorithm.draw_prize()
     
     if prize is None:
@@ -118,8 +110,18 @@ def draw_api(request):
             'success': False,
             'message': message,
             'code': 'DRAW_FAILED',
-            'remaining_chances': remaining_after
+            'remaining_chances': remaining
         }, status=400)
+    
+    success, remaining_after = redis_service.consume_chance(user.id)
+    if not success:
+        lottery_algorithm.increase_stock(prize.id)
+        return JsonResponse({
+            'success': False,
+            'message': '消耗抽奖次数失败，请重试',
+            'code': 'CONSUME_FAILED',
+            'remaining_chances': remaining
+        }, status=500)
     
     ip_address = redis_service.get_client_ip(request)
     user_agent = request.META.get('HTTP_USER_AGENT', '')
@@ -182,4 +184,20 @@ def get_lottery_records_api(request):
         'total': total,
         'page': page,
         'page_size': page_size
+    })
+
+
+@login_required
+@require_http_methods(['GET'])
+def get_probability_validation_api(request):
+    if not request.user.is_staff:
+        return JsonResponse({
+            'success': False,
+            'message': '无权限访问'
+        }, status=403)
+    
+    status = lottery_algorithm.get_probability_validation_status()
+    return JsonResponse({
+        'success': True,
+        'validation': status
     })

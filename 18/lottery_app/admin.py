@@ -36,12 +36,12 @@ class UserProfileAdmin(BaseUserAdmin):
 
 @admin.register(Prize)
 class PrizeAdmin(admin.ModelAdmin):
-    list_display = ('prize_type_display', 'name', 'probability', 'current_stock', 'total_stock', 'points_value', 'is_active', 'sort_order', 'stock_progress')
+    list_display = ('prize_type_display', 'name', 'probability', 'current_stock', 'total_stock', 'points_value', 'is_active', 'sort_order', 'stock_progress', 'probability_validation_status')
     list_filter = ('prize_type', 'is_active', 'created_at')
     search_fields = ('name', 'description')
     ordering = ('sort_order', 'prize_type')
     readonly_fields = ('created_at', 'updated_at')
-    actions = ['sync_stock_to_redis', 'sync_all_stock', 'clear_cache', 'activate_prizes', 'deactivate_prizes']
+    actions = ['sync_stock_to_redis', 'sync_all_stock', 'clear_cache', 'activate_prizes', 'deactivate_prizes', 'validate_probability']
     
     fieldsets = (
         ('基本信息', {
@@ -117,6 +117,44 @@ class PrizeAdmin(admin.ModelAdmin):
         tasks.clear_lottery_cache.delay()
         self.message_user(request, f'已禁用 {updated} 个奖品')
     deactivate_prizes.short_description = '禁用选中的奖品'
+    
+    def validate_probability(self, request, queryset):
+        algorithm = LotteryAlgorithm()
+        valid, total_prob, message = algorithm.validate_probability_sum()
+        
+        if valid:
+            self.message_user(
+                request, 
+                format_html(
+                    '<span style="color: #2ecc71; font-weight: bold;">{}</span>',
+                    f'概率校验通过！总和: {total_prob}%'
+                )
+            )
+        else:
+            self.message_user(
+                request,
+                format_html(
+                    '<span style="color: #e74c3c; font-weight: bold;">{}</span>',
+                    message
+                )
+            )
+    validate_probability.short_description = '校验概率总和是否为100%'
+    
+    def probability_validation_status(self, obj):
+        algorithm = LotteryAlgorithm()
+        status = algorithm.get_probability_validation_status()
+        
+        if status['valid']:
+            return format_html(
+                '<span style="color: #2ecc71; font-weight: bold;">✓ 总和: {}%</span>',
+                status['total']
+            )
+        else:
+            return format_html(
+                '<span style="color: #e74c3c; font-weight: bold;">✗ 总和: {}%</span>',
+                status['total']
+            )
+    probability_validation_status.short_description = '概率校验'
     
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)

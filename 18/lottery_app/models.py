@@ -53,6 +53,30 @@ class Prize(models.Model):
     def __str__(self):
         return f'{self.get_prize_type_display()} - {self.name}'
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from decimal import Decimal
+        
+        if self.probability < 0 or self.probability > 100:
+            raise ValidationError({'probability': '概率必须在 0-100 之间'})
+        
+        if self.is_active:
+            other_prizes = Prize.objects.filter(is_active=True).exclude(id=self.id)
+            total_prob = sum(p.probability for p in other_prizes) + self.probability
+            diff = abs(total_prob - Decimal('100'))
+            
+            if diff > Decimal('0.01'):
+                raise ValidationError(
+                    f'所有启用奖品的概率总和必须为 100%，当前总和为 {total_prob}%，差值为 {diff}%'
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+        from .lottery_algorithm import LotteryAlgorithm
+        algorithm = LotteryAlgorithm()
+        algorithm.clear_cache()
+
 
 class LotteryRecord(models.Model):
     user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, verbose_name='用户')

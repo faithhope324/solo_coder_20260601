@@ -12,4 +12,5 @@ urlpatterns = [
     path('api/chances/', views.get_remaining_chances_api, name='api_chances'),
     path('api/draw/', views.draw_api, name='api_draw'),
     path('api/records/', views.get_lottery_records_api, name='api_records'),
+    path('api/probability/validation/', views.get_probability_validation_api, name='api_probability_validation'),
 ]
