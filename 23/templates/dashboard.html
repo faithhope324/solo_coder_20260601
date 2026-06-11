@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电商购物车放弃分析仪表板</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f0f2f5;
+            color: #2d3436;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .header p {
+            margin-top: 8px;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .label {
+            font-size: 14px;
+            color: #636e72;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2d3436;
+        }
+
+        .stat-card.highlight .value {
+            color: #e74c3c;
+        }
+
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-card h3 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #2d3436;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-card h3::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #6c5ce7;
+            border-radius: 2px;
+        }
+
+        .chart-container {
+            width: 100%;
+            min-height: 400px;
+        }
+
+        .funnel-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .funnel-table th,
+        .funnel-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .funnel-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #636e72;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .funnel-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .rate-bar {
+            display: inline-block;
+            height: 8px;
+            background: #6c5ce7;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        .anomaly-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .anomaly-table th,
+        .anomaly-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .anomaly-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #636e72;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .anomaly-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge.mobile {
+            background: #ffe5e5;
+            color: #e74c3c;
+        }
+
+        .badge.pc {
+            background: #e5f8f6;
+            color: #00b894;
+        }
+
+        .badge.warning {
+            background: #fff3cd;
+            color: #d39e00;
+        }
+
+        .peak-list {
+            list-style: none;
+        }
+
+        .peak-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .peak-list li:last-child {
+            border-bottom: none;
+        }
+
+        .peak-hour {
+            font-weight: 600;
+            color: #e74c3c;
+            font-size: 16px;
+        }
+
+        .peak-rate {
+            background: #ffe5e5;
+            color: #e74c3c;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .insight-box {
+            background: linear-gradient(135deg, #fff5e6, #ffe4c4);
+            border-left: 4px solid #f39c12;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .insight-box h4 {
+            color: #e67e22;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .insight-box p {
+            font-size: 13px;
+            color: #d35400;
+            line-height: 1.6;
+        }
+
+        .table-wrapper {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 1024px) {
+            .chart-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛒 电商购物车放弃分析仪表板</h1>
+        <p>深度分析用户购物车行为，洞察流失原因，优化转化效率</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="label">总会话数</div>
+            <div class="value">{{ "{:,}".format(stats.total_sessions) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">加购会话数</div>
+            <div class="value">{{ "{:,}".format(stats.total_cart_sessions) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">支付成功会话数</div>
+            <div class="value">{{ "{:,}".format(stats.total_payment_sessions) }}</div>
+        </div>
+        <div class="stat-card highlight">
+            <div class="label">整体购物车放弃率</div>
+            <div class="value">{{ "%.1f"|format(stats.overall_abandon_rate * 100) }}%</div>
+        </div>
+        <div class="stat-card highlight">
+            <div class="label">异常 Session 数</div>
+            <div class="value">{{ stats.anomaly_count }}</div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card">
+            <h3>购物车漏斗转化图</h3>
+            <div id="funnel-chart" class="chart-container"></div>
+            <table class="funnel-table">
+                <thead>
+                    <tr>
+                        <th>阶段</th>
+                        <th>会话数</th>
+                        <th>转化率</th>
+                        <th>流失率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in funnel_data %}
+                    <tr>
+                        <td>{{ item.label }}</td>
+                        <td>{{ "{:,}".format(item.count) }}</td>
+                        <td>
+                            <span class="rate-bar" style="width: {{ item.conversion_rate * 100 }}px"></span>
+                            {{ "%.1f"|format(item.conversion_rate * 100) }}%
+                        </td>
+                        <td>{{ "%.1f"|format(item.drop_off_rate * 100) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="chart-card">
+            <h3>按设备分组漏斗转化率</h3>
+            <div id="device-funnel-chart" class="chart-container"></div>
+            <div class="insight-box">
+                <h4>💡 设备对比洞察</h4>
+                <p>
+                    {% if device_funnel.mobile and device_funnel.pc %}
+                        {% set mobile_rate = device_funnel.mobile[2].conversion_rate %}
+                        {% set pc_rate = device_funnel.pc[2].conversion_rate %}
+                        {% if mobile_rate < pc_rate %}
+                            PC 端整体转化率（{{ "%.1f"|format(pc_rate * 100) }}%）优于移动端（{{ "%.1f"|format(mobile_rate * 100) }}%），
+                            建议优化移动端结算体验。
+                        {% else %}
+                            移动端整体转化率（{{ "%.1f"|format(mobile_rate * 100) }}%）优于 PC 端（{{ "%.1f"|format(pc_rate * 100) }}%）。
+                        {% endif %}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card full-width">
+            <h3>24小时购物车放弃率趋势</h3>
+            <div id="hourly-chart" class="chart-container"></div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px;">
+                {% for hour in peak_hours %}
+                <div style="background: #fff5f5; padding: 16px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 12px; color: #e74c3c; margin-bottom: 4px;">放弃率高峰 #{{ loop.index }}</div>
+                    <div class="peak-hour">{{ hour.hour_label }}</div>
+                    <div class="peak-rate" style="margin-top: 8px;">{{ "%.1f"|format(hour.abandonment_rate * 100) }}%</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card full-width">
+            <h3>Top 10 高放弃率品类</h3>
+            <div id="category-chart" class="chart-container"></div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card full-width">
+            <h3>🔍 异常 Session 检测（加购 ≥ 10 件且未支付）</h3>
+            <p style="color: #636e72; font-size: 13px; margin-bottom: 16px;">
+                共发现 <strong style="color: #e74c3c;">{{ stats.anomaly_count }}</strong> 个异常 Session，以下展示前 50 条记录
+            </p>
+            <div class="table-wrapper">
+                <table class="anomaly-table">
+                    <thead>
+                        <tr>
+                            <th>Session ID</th>
+                            <th>User ID</th>
+                            <th>设备</th>
+                            <th>加购商品数</th>
+                            <th>首次操作时间</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in anomaly_sessions %}
+                        <tr>
+                            <td><code>{{ session.session_id }}</code></td>
+                            <td>{{ session.user_id }}</td>
+                            <td>
+                                <span class="badge {{ session.device }}">
+                                    {{ '移动端' if session.device == 'mobile' else 'PC端' }}
+                                </span>
+                            </td>
+                            <td><strong style="color: #e74c3c;">{{ session.cart_item_count }}</strong> 件</td>
+                            <td>{{ session.first_action_time }}</td>
+                            <td><span class="badge warning">待跟进</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const funnelData = {{ charts.funnel|safe }};
+        Plotly.newPlot('funnel-chart', funnelData.data, funnelData.layout, {responsive: true});
+
+        const deviceFunnelData = {{ charts.device_funnel|safe }};
+        Plotly.newPlot('device-funnel-chart', deviceFunnelData.data, deviceFunnelData.layout, {responsive: true});
+
+        const hourlyData = {{ charts.hourly_abandonment|safe }};
+        Plotly.newPlot('hourly-chart', hourlyData.data, hourlyData.layout, {responsive: true});
+
+        const categoryData = {{ charts.category_abandonment|safe }};
+        Plotly.newPlot('category-chart', categoryData.data, categoryData.layout, {responsive: true});
+    </script>
+</body>
+</html>
