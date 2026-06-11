@@ -18,10 +18,10 @@ class FunnelCalculator:
         for s in sessions:
             if s['has_add_cart']:
                 counts['add_cart'] += 1
-            if s['has_enter_checkout']:
-                counts['enter_checkout'] += 1
-            if s['has_payment_success']:
-                counts['payment_success'] += 1
+                if s['has_enter_checkout']:
+                    counts['enter_checkout'] += 1
+                if s['has_payment_success']:
+                    counts['payment_success'] += 1
         
         result = []
         prev_count = None
@@ -48,10 +48,10 @@ class FunnelCalculator:
             device = s['device']
             if s['has_add_cart']:
                 device_counts[device]['add_cart'] += 1
-            if s['has_enter_checkout']:
-                device_counts[device]['enter_checkout'] += 1
-            if s['has_payment_success']:
-                device_counts[device]['payment_success'] += 1
+                if s['has_enter_checkout']:
+                    device_counts[device]['enter_checkout'] += 1
+                if s['has_payment_success']:
+                    device_counts[device]['payment_success'] += 1
         
         result = {}
         for device, counts in device_counts.items():
@@ -82,8 +82,8 @@ class FunnelCalculator:
                 continue
             if s['has_add_cart']:
                 hourly[hour]['add_cart'] += 1
-            if s['has_payment_success']:
-                hourly[hour]['payment_success'] += 1
+                if s['has_payment_success']:
+                    hourly[hour]['payment_success'] += 1
         
         result = []
         for h in range(24):

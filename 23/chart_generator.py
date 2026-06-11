@@ -33,13 +33,9 @@ class ChartGenerator:
         ))
 
         fig.update_layout(
-            title={
-                'text': '购物车漏斗转化图',
-                'font': {'size': 20}
-            },
             showlegend=False,
             height=450,
-            margin={'l': 20, 'r': 20, 't': 60, 'b': 20}
+            margin={'l': 20, 'r': 20, 't': 20, 'b': 20}
         )
 
         return pio.to_json(fig)
@@ -69,10 +65,6 @@ class ChartGenerator:
                 ))
 
         fig.update_layout(
-            title={
-                'text': '按设备分组漏斗转化率对比',
-                'font': {'size': 20}
-            },
             barmode='group',
             xaxis={'title': {'text': '漏斗阶段'}},
             yaxis={'title': {'text': '会话数'}},
@@ -84,7 +76,7 @@ class ChartGenerator:
                 'xanchor': 'center'
             },
             height=450,
-            margin={'l': 20, 'r': 20, 't': 60, 'b': 20},
+            margin={'l': 20, 'r': 20, 't': 20, 'b': 20},
             plot_bgcolor='rgba(0,0,0,0.02)'
         )
 
@@ -121,10 +113,6 @@ class ChartGenerator:
         )
 
         fig.update_layout(
-            title={
-                'text': '24小时购物车放弃率趋势',
-                'font': {'size': 20}
-            },
             xaxis={'title': {'text': '小时'}},
             yaxis={
                 'title': {'text': '加购会话数', 'font': {'color': '#3498DB'}},
@@ -145,7 +133,7 @@ class ChartGenerator:
                 'xanchor': 'center'
             },
             height=450,
-            margin={'l': 20, 'r': 20, 't': 60, 'b': 20},
+            margin={'l': 20, 'r': 20, 't': 20, 'b': 20},
             plot_bgcolor='rgba(0,0,0,0.02)'
         )
 
@@ -186,10 +174,6 @@ class ChartGenerator:
         )
 
         fig.update_layout(
-            title={
-                'text': 'Top 10 高放弃率品类',
-                'font': {'size': 20}
-            },
             yaxis={'title': {'text': ''}},
             xaxis={
                 'title': {'text': '加购会话数', 'font': {'color': '#27AE60'}},
@@ -210,7 +194,7 @@ class ChartGenerator:
                 'xanchor': 'center'
             },
             height=500,
-            margin={'l': 80, 'r': 20, 't': 60, 'b': 20},
+            margin={'l': 80, 'r': 20, 't': 20, 'b': 20},
             plot_bgcolor='rgba(0,0,0,0.02)'
         )
 
