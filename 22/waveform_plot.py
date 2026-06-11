@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'KaiTi', 'DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
@@ -8,7 +11,7 @@ from matplotlib.widgets import SpanSelector
 class WaveformCanvas(FigureCanvas):
     region_selected = pyqtSignal(float, float)
 
-    def __init__(self, parent=None, width=8, height=2.5, dpi=100, duration=2.0, sample_rate=44100):
+    def __init__(self, parent=None, width=8, height=2.5, dpi=120, duration=2.0, sample_rate=44100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         super().__init__(self.fig)
         self.setParent(parent)

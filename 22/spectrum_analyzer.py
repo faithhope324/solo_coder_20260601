@@ -1,5 +1,8 @@
 import numpy as np
 from scipy.signal import find_peaks
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'KaiTi', 'DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
@@ -84,7 +87,7 @@ class SpectrumAnalyzer:
 class SpectrumCanvas(FigureCanvas):
     region_selected = pyqtSignal(float, float)
 
-    def __init__(self, parent=None, width=8, height=3, dpi=100):
+    def __init__(self, parent=None, width=8, height=3, dpi=120):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         super().__init__(self.fig)
         self.setParent(parent)

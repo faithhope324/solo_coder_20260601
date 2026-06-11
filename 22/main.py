@@ -1,5 +1,8 @@
 import sys
 import numpy as np
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'KaiTi', 'DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QFileDialog, QMessageBox,
@@ -495,6 +498,69 @@ class AudioSpectrumAnalyzer(QMainWindow):
             freq_min, freq_max = freq_max, freq_min
         self.statusBar().showMessage(f'频率范围: {freq_min:.0f}Hz - {freq_max:.0f}Hz', 3000)
 
+        if self.mode != 'file' or self.full_audio_data is None:
+            return
+
+        if freq_max - freq_min < 10:
+            return
+
+        best_start, best_end = self._find_strongest_time_region(freq_min, freq_max)
+        if best_start is not None and best_end is not None:
+            start_sample = int(best_start * self.sample_rate)
+            end_sample = int(best_end * self.sample_rate)
+            if end_sample > len(self.full_audio_data):
+                end_sample = len(self.full_audio_data)
+
+            if end_sample - start_sample >= self.fft_size:
+                self.selected_audio_data = self.full_audio_data[start_sample:end_sample].copy()
+                self.selected_sample_rate = self.sample_rate
+                self.selection_label.setText(f'{best_start:.3f}s - {best_end:.3f}s')
+                self.waveform_canvas.highlight_region(best_start, best_end)
+                self.btn_analyze.setEnabled(True)
+                self.btn_play.setEnabled(True)
+
+    def _find_strongest_time_region(self, freq_min, freq_max, window_duration=0.5, step=0.1):
+        if self.full_audio_data is None or len(self.full_audio_data) == 0:
+            return None, None
+
+        total_duration = len(self.full_audio_data) / self.sample_rate
+        if total_duration < window_duration:
+            window_duration = total_duration
+            step = window_duration / 2
+
+        best_energy = -np.inf
+        best_start = 0.0
+        best_end = window_duration
+
+        t = 0.0
+        while t + window_duration <= total_duration:
+            start_sample = int(t * self.sample_rate)
+            end_sample = start_sample + int(window_duration * self.sample_rate)
+            segment = self.full_audio_data[start_sample:end_sample]
+
+            if len(segment) < self.fft_size:
+                padded = np.zeros(self.fft_size)
+                padded[:len(segment)] = segment
+                segment = padded
+
+            window = np.hanning(len(segment))
+            segment_windowed = segment * window
+            fft_result = np.fft.rfft(segment_windowed, self.fft_size)
+            magnitude = np.abs(fft_result)
+            freqs = np.fft.rfftfreq(self.fft_size, 1.0 / self.sample_rate)
+
+            freq_mask = (freqs >= freq_min) & (freqs <= freq_max)
+            if np.any(freq_mask):
+                energy = np.mean(magnitude[freq_mask] ** 2)
+                if energy > best_energy:
+                    best_energy = energy
+                    best_start = t
+                    best_end = t + window_duration
+
+            t += step
+
+        return best_start, best_end
+
     def analyze_selection(self):
         if self.selected_audio_data is None:
             return
@@ -550,8 +616,16 @@ class AudioSpectrumAnalyzer(QMainWindow):
 
 
 def main():
+    matplotlib.rcParams['figure.dpi'] = 120
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
+
+    font = app.font()
+    font.setPointSize(font.pointSize() + 1)
+    app.setFont(font)
 
     window = AudioSpectrumAnalyzer()
     window.show()

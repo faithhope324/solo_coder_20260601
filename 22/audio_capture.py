@@ -76,7 +76,17 @@ class AudioCapture(QThread):
                 data = self.stream.read(self.chunk, exception_on_overflow=False)
                 audio_data = np.frombuffer(data, dtype=np.float32)
                 if self.channels > 1:
-                    audio_data = audio_data.reshape(-1, self.channels).mean(axis=1)
+                    expected_len = self.chunk * self.channels
+                    actual_len = len(audio_data)
+                    if actual_len >= expected_len:
+                        audio_data = audio_data[:expected_len].reshape(-1, self.channels).mean(axis=1)
+                    else:
+                        n_frames = actual_len // self.channels
+                        if n_frames > 0:
+                            audio_data = audio_data[:n_frames * self.channels].reshape(-1, self.channels).mean(axis=1)
+                        else:
+                            audio_data = audio_data[:self.channels].mean()
+                            audio_data = np.array([audio_data], dtype=np.float32)
                 self.data_received.emit(audio_data)
             except Exception as e:
                 print(f"Audio capture error: {e}")
@@ -140,7 +150,13 @@ class WavFileLoader:
         audio_data = np.frombuffer(raw_data, dtype=dtype).astype(np.float32) / max_val
 
         if channels > 1:
-            audio_data = audio_data.reshape(-1, channels).mean(axis=1)
+            expected_len = n_frames * channels
+            actual_len = len(audio_data)
+            usable_frames = min(n_frames, actual_len // channels)
+            if usable_frames > 0:
+                audio_data = audio_data[:usable_frames * channels].reshape(-1, channels).mean(axis=1)
+            else:
+                audio_data = np.zeros(n_frames, dtype=np.float32)
 
         return audio_data, sample_rate
 
