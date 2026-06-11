@@ -120,7 +120,7 @@ class AudioSpectrumAnalyzer(QMainWindow):
         btn_layout.addWidget(self.btn_load)
         btn_layout.addWidget(self.btn_play)
         btn_layout.addWidget(self.btn_analyze)
-        layout.addLayout(btn_layout)
+        layout.addLayout(btn_layout, stretch=1)
 
         param_layout = QGridLayout()
         param_layout.setHorizontalSpacing(10)
